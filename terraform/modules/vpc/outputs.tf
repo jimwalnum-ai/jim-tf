@@ -19,5 +19,5 @@ output "vpc_cidr" {
 }
 
 output "vpc_list" {
-  value = [aws_vpc.vpc.id,aws_vpc.vpc.id,aws_vpc.vpc.id]
+  value = [aws_vpc.vpc.id, aws_vpc.vpc.id, aws_vpc.vpc.id]
 }

@@ -3,10 +3,10 @@ resource "aws_networkfirewall_firewall" "inspection_vpc_fw" {
   firewall_policy_arn = aws_networkfirewall_firewall_policy.fw_policy.arn
   vpc_id              = module.vpc-inspect.vpc_id
   subnet_mapping {
-    subnet_id = module.vpc-inspect.private_subnets[0].id
+    subnet_id = module.vpc-inspect.firewall_subnets[0].id
   }
   subnet_mapping {
-    subnet_id = module.vpc-inspect.private_subnets[1].id
+    subnet_id = module.vpc-inspect.firewall_subnets[1].id
   }
   depends_on = [module.vpc-inspect]
 }
@@ -77,11 +77,12 @@ resource "aws_networkfirewall_rule_group" "block_domains" {
 }
 
 resource "aws_cloudwatch_log_group" "fw_alert_log_group" {
-  name = "/aws/network-firewall/alert"
+  name              = "/aws/network-firewall/alert"
+  retention_in_days = 365
 }
 
 resource "aws_s3_bucket" "fw_flow_bucket" {
-  bucket        = "cs-use1-network-firewall-flow-bucket-1"
+  bucket        = "${local.prefix}-use1-network-firewall-flow-bucket-1"
   force_destroy = true
 }
 
@@ -95,11 +96,24 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cs-fw-encrypt" {
 }
 
 resource "aws_s3_bucket_public_access_block" "fw_flow_bucket_public_access_block" {
-  bucket = aws_s3_bucket.fw_flow_bucket.id
+  bucket                  = aws_s3_bucket.fw_flow_bucket.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "fw_flow_bucket_retention" {
+  bucket = aws_s3_bucket.fw_flow_bucket.id
+
+  rule {
+    id     = "retain-1y"
+    status = "Enabled"
+
+    expiration {
+      days = 365
+    }
+  }
 }
 
 resource "aws_networkfirewall_logging_configuration" "fw_alert_logging_configuration" {

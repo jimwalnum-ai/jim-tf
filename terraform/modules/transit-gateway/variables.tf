@@ -1,10 +1,10 @@
 variable "env" {
-  type = string
+  type        = string
   description = "Env"
 }
 
 variable "tags" {
-  type = map(string)
+  type        = map(string)
   description = "Tags"
-  default = {}
+  default     = {}
 }

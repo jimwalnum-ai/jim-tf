@@ -1,12 +1,12 @@
 resource "aws_key_pair" "ec2" {
-    key_name = "cs_key_pair"
-    public_key  = file("../../../.ssh/id_rsa.pub")
+  key_name   = "cs_key_pair"
+  public_key = file("../../../.ssh/id_rsa.pub")
 }
 
 data "aws_subnets" "private_selected" {
   filter {
     name   = "tag:scope"
-    values = ["private"] 
+    values = ["private"]
   }
   filter {
     name   = "vpc-id"
@@ -17,7 +17,7 @@ data "aws_subnets" "private_selected" {
 data "aws_subnets" "public_selected" {
   filter {
     name   = "tag:scope"
-    values = ["public"] 
+    values = ["public"]
   }
   filter {
     name   = "vpc-id"
@@ -26,25 +26,25 @@ data "aws_subnets" "public_selected" {
 }
 
 resource "aws_instance" "ec2_public_instance_1" {
-    ami = "ami-090e0fc566929d98b"
-    subnet_id = data.aws_subnets.public_selected.ids[0]
-    instance_type = "t3.small"
-    iam_instance_profile = aws_iam_instance_profile.private.name
-    key_name = aws_key_pair.ec2.key_name
-    vpc_security_group_ids = [aws_security_group.public_instance.id]
-    associate_public_ip_address = true
-    tags = "${merge(local.tags,{Name="test-ec2-ldap-1"})}"
+  ami                         = "ami-090e0fc566929d98b"
+  subnet_id                   = data.aws_subnets.public_selected.ids[0]
+  instance_type               = "t3.small"
+  iam_instance_profile        = aws_iam_instance_profile.private.name
+  key_name                    = aws_key_pair.ec2.key_name
+  vpc_security_group_ids      = [aws_security_group.public_instance.id]
+  associate_public_ip_address = true
+  tags                        = merge(local.tags, { Name = "test-ec2-ldap-1" })
 }
 
 resource "aws_instance" "ec2_public_instance_2" {
-    ami = "ami-090e0fc566929d98b"
-    subnet_id = data.aws_subnets.public_selected.ids[0]
-    instance_type = "t3.medium"
-    iam_instance_profile = aws_iam_instance_profile.private.name
-    key_name = aws_key_pair.ec2.key_name
-    vpc_security_group_ids = [aws_security_group.public_instance.id]
-    associate_public_ip_address = true
-    tags = "${merge(local.tags,{Name="test-ec2-git-2"})}"
+  ami                         = "ami-090e0fc566929d98b"
+  subnet_id                   = data.aws_subnets.public_selected.ids[0]
+  instance_type               = "t3.medium"
+  iam_instance_profile        = aws_iam_instance_profile.private.name
+  key_name                    = aws_key_pair.ec2.key_name
+  vpc_security_group_ids      = [aws_security_group.public_instance.id]
+  associate_public_ip_address = true
+  tags                        = merge(local.tags, { Name = "test-ec2-git-2" })
 }
 
 
@@ -54,13 +54,13 @@ resource "aws_iam_instance_profile" "private" {
 }
 
 resource "aws_instance" "ec2_private_instance" {
-    ami = "ami-090e0fc566929d98b"
-    subnet_id = data.aws_subnets.private_selected.ids[0]
-    instance_type = "t3.micro"
-    iam_instance_profile = aws_iam_instance_profile.private.name
-    key_name = aws_key_pair.ec2.key_name
-    vpc_security_group_ids = [aws_security_group.private_instance.id]
-    tags = "${merge(local.tags,{Name="test-ec2-priv"})}"
+  ami                    = "ami-090e0fc566929d98b"
+  subnet_id              = data.aws_subnets.private_selected.ids[0]
+  instance_type          = "t3.micro"
+  iam_instance_profile   = aws_iam_instance_profile.private.name
+  key_name               = aws_key_pair.ec2.key_name
+  vpc_security_group_ids = [aws_security_group.private_instance.id]
+  tags                   = merge(local.tags, { Name = "test-ec2-priv" })
 }
 
 resource "aws_security_group" "public_instance" {

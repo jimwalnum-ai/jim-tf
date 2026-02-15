@@ -12,7 +12,7 @@ provider "aws" {
 # let's follow settings for this link. https://docs.aws.amazon.com/vpc/latest/ipam/tutorials-create-vpc-ipam.html
 
 # service linked role
-resource "aws_iam_service_linked_role" "ipam" 
+resource "aws_iam_service_linked_role" "ipam" {
   aws_service_name = "ipam.amazonaws.com"
   description      = "Service Linked Role for AWS VPC IP Address Manager"
 }
@@ -64,7 +64,7 @@ resource "aws_vpc_ipam_pool" "regional" {
 }
 
 resource "aws_vpc_ipam_pool_cidr" "regional" {
-  for_each     = { for index, region in tolist(local.deduplicated_region_list) : region => index } 
+  for_each     = { for index, region in tolist(local.deduplicated_region_list) : region => index }
   ipam_pool_id = aws_vpc_ipam_pool.regional[each.key].id
   cidr         = cidrsubnet(var.top_level_pool_cidr, 8, each.value)
 }

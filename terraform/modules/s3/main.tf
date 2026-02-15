@@ -4,23 +4,23 @@
 
 resource "aws_s3_bucket" "bucket" {
   bucket = var.bucket_name
-  tags = var.tags
+  tags   = var.tags
   dynamic "logging" {
-   for_each = var.logging_bucket
-   content {
+    for_each = var.logging_bucket
+    content {
       target_bucket = var.logging_bucket
       target_prefix = var.logging_prefix
-   }
+    }
   }
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "short_bucket" {
-  count = var.life_cycle_term == "short-term" ? 1 : 0
+  count  = var.life_cycle_term == "short-term" ? 1 : 0
   bucket = aws_s3_bucket.bucket.id
 
   rule {
     status = "Enabled"
-    id  = "archive-after-short-term"
+    id     = "archive-after-short-term"
 
     transition {
       days          = 30
@@ -33,7 +33,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "short_bucket" {
     }
 
     expiration {
-      days = 360
+      days = 365
     }
   }
 }
@@ -58,7 +58,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "encrypt" {
 
 # no public access
 resource "aws_s3_bucket_public_access_block" "access" {
-  bucket = aws_s3_bucket.bucket.id
+  bucket                  = aws_s3_bucket.bucket.id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -85,7 +85,7 @@ data "aws_iam_policy_document" "flow_log_s3" {
       type        = "Service"
       identifiers = ["delivery.logs.amazonaws.com"]
     }
-    actions = ["s3:PutObject"]
+    actions   = ["s3:PutObject"]
     resources = ["arn:aws:s3:::${var.bucket_name}/AWSLogs/*"]
   }
   statement {
@@ -94,7 +94,7 @@ data "aws_iam_policy_document" "flow_log_s3" {
       type        = "Service"
       identifiers = ["delivery.logs.amazonaws.com"]
     }
-    actions = ["s3:GetBucketAcl"]
+    actions   = ["s3:GetBucketAcl"]
     resources = ["arn:aws:s3:::${var.bucket_name}"]
   }
 }

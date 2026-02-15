@@ -2,9 +2,9 @@ module "private_hosted_zone" {
   source      = "../modules/route53"
   domain      = "crimsonscallion.com"
   description = "R53 Terraform"
-  vpc_id = module.vpc-dev.vpc_id
-  vpc_region = "us-east-1"
-  
+  vpc_id      = module.vpc-dev.vpc_id
+  vpc_region  = "us-east-1"
+
   tags = {
     environment = "development"
   }

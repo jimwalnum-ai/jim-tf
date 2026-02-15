@@ -1,48 +1,66 @@
 variable "name" {
-  type = string
+  type        = string
   description = "Name for the VPC"
 }
 
 variable "env" {
-  type = string
+  type        = string
   description = "Evironment (dev,uat,prod)"
 }
 
 variable "region" {
-  type = string
+  type        = string
   description = "VPC Region"
 }
 
 variable "flow_log_bucket" {
-  type = string
+  type        = string
   description = "Flow log bucket arn"
 }
 
 variable "transit_gateway" {
-  type = string
+  type        = string
   description = "Transit gateway id (opt)"
-  default = ""
+  default     = ""
 }
 
-variable super_cidr_block {
+variable "super_cidr_block" {
   type = string
 }
 
 variable "ipv4_ipam_pool_id" {
-  type = string
+  type        = string
   description = "IPAM Pool Id"
 }
 
 variable "ipv4_netmask_length" {
-  type = number
+  type        = number
   description = "Netmask for PVC"
-  default = 24
+  default     = 24
+}
+
+variable "tgw_subnet_cidr_offset" {
+  type        = number
+  description = "Index offset for TGW subnet CIDRs within the VPC CIDR"
+  default     = 4
+}
+
+variable "public_ingress_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed to access public subnets (SSH/HTTPS)"
+  default     = []
+}
+
+variable "internal_ingress_cidrs" {
+  type        = list(string)
+  description = "Internal CIDRs allowed for east-west traffic"
+  default     = []
 }
 
 variable "tags" {
-  type = map(string)
+  type        = map(string)
   description = "Tags (opt)"
-  default = {}
+  default     = {}
 }
 
 

@@ -5,12 +5,12 @@ resource "aws_cloudtrail" "cs" {
 }
 
 module "s3-cloudtrail" {
- source = "../modules/s3"
- bucket_name = "cs-use1-cloud-trail"
- bucket_policy = ""
- kms_key = module.backend-kms-key.kms_key_arn
- versioning = "Enabled"
- tags = local.tags
+  source        = "../modules/s3"
+  bucket_name   = "${local.prefix}-use1-cloud-trail"
+  bucket_policy = ""
+  kms_key       = module.backend-kms-key.kms_key_arn
+  versioning    = "Enabled"
+  tags          = local.tags
 }
 
 data "aws_iam_policy_document" "cloudtrail" {
@@ -27,19 +27,19 @@ data "aws_iam_policy_document" "cloudtrail" {
     resources = [module.s3-cloudtrail.bucket_arn]
   }
 
- statement {
-     sid = "RequireSSL"
-     actions =  ["s3:*"]
-     effect =  "Deny"
-     principals {
-        type  = "AWS"
-        identifiers = ["*"]
-     }	
-     resources =  ["${module.s3-cloudtrail.bucket_arn}"]
-     condition {
+  statement {
+    sid     = "RequireSSL"
+    actions = ["s3:*"]
+    effect  = "Deny"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    resources = ["${module.s3-cloudtrail.bucket_arn}"]
+    condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
-      values = [false]
+      values   = [false]
     }
   }
 

@@ -5,8 +5,8 @@ locals {
 resource "aws_kms_key" "kms_key" {
   description             = var.key_name
   deletion_window_in_days = 7
-  policy = data.template_file.kms_key_policy.rendered
-  depends_on = [data.template_file.kms_key_policy]
+  policy                  = data.template_file.kms_key_policy.rendered
+  depends_on              = [data.template_file.kms_key_policy]
 }
 
 resource "aws_kms_alias" "kms_key_alias" {
@@ -17,8 +17,8 @@ resource "aws_kms_alias" "kms_key_alias" {
 data "template_file" "kms_key_policy" {
   template = file("${path.module}/templates/kms_key_policy.json.tpl")
   vars = {
-    write_resources =  "${jsonencode(local.access_roles)}"
-    allowed_resources = "${jsonencode(concat(var.readonly_roles,local.access_roles))}"
+    write_resources   = "${jsonencode(local.access_roles)}"
+    allowed_resources = "${jsonencode(concat(var.readonly_roles, local.access_roles))}"
   }
 }
 

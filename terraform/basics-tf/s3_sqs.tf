@@ -8,16 +8,16 @@
 #}
 
 module "s3-sqs" {
- source = "../modules/s3"
- bucket_name = "cs-use1-sqs-data-bucket-1"
- bucket_policy = ""
- tags = local.tags
+  source        = "../modules/s3"
+  bucket_name   = "${local.prefix}-use1-sqs-data-bucket-1"
+  bucket_policy = ""
+  tags          = local.tags
 }
 
 data "template_file" "s3_sqs_policy" {
-  template = "${file("./templates/s3_sqs_bucket_policy.json.tpl")}"
+  template = file("./templates/s3_sqs_bucket_policy.json.tpl")
   vars = {
-    bucket_name   = module.s3-sqs.bucket_name
+    bucket_name = module.s3-sqs.bucket_name
     tf_user_arn = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
   }
 }

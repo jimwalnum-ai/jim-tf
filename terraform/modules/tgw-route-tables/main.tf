@@ -1,7 +1,7 @@
 
-data "aws_subnet" "tgw"{
-filter {
-    name   = "tag:type"    
+data "aws_subnet" "tgw" {
+  filter {
+    name   = "tag:type"
     values = ["tgw"]
   }
 }
@@ -22,7 +22,7 @@ resource "aws_ec2_transit_gateway_route_table" "inspection_route_table" {
 }
 
 resource "aws_ec2_transit_gateway_route_table_association" "spoke_tgw_attachment_rt_association" {
-  count = length(var.spoke_subnets)
+  count                          = length(var.spoke_subnets)
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke_tgw_attachment[count.index].id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke_route_table.id
 }
@@ -39,7 +39,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "inspection_vpc_tgw_attachment
 }
 
 resource "aws_ec2_transit_gateway_vpc_attachment" "spoke_tgw_attachment" {
-  count = length(var.spoke_subnets)
+  count                                           = length(var.spoke_subnets)
   subnet_ids                                      = var.spoke_subnets
   transit_gateway_id                              = var.tgw_id
   vpc_id                                          = var.spoke_vpc_ids[count.index]
@@ -63,7 +63,7 @@ resource "aws_ec2_transit_gateway_route_table_association" "inspection_vpc_tgw_a
 }
 
 resource "aws_ec2_transit_gateway_route_table_propagation" "inspection_route_table_propagate_spoke" {
-  count = length(var.spoke_subnets)
+  count                          = length(var.spoke_subnets)
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke_tgw_attachment[count.index].id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.inspection_route_table.id
 }

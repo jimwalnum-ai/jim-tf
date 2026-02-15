@@ -1,90 +1,102 @@
 variable "name" {
-  type = string
+  type        = string
   description = "Name for the VPC"
 }
 
 variable "env" {
-  type = string
+  type        = string
   description = "Evironment (dev,uat,prod)"
 }
 
 variable "region" {
-  type = string
+  type        = string
   description = "VPC Region"
 }
 
 variable "flow_log_bucket" {
-  type = string
+  type        = string
   description = "Flow log bucket arn"
 }
 
 variable "endpoint_access_role" {
-  type = string
+  type        = string
   description = "Role arn for that can access endpoints"
 }
 
 variable "test" {
-  type = string
+  type    = string
   default = false
 }
 
 variable "endpoint_list" {
-  type = list(string)
+  type        = list(string)
   description = "List of VPC endpoints to create, s3 endpoint is automatic (opt)"
-  default = ["ecr.api","ecr.dkr","logs","ec2","sts","eks","sqs"]
+  default     = ["ecr.api", "ecr.dkr", "logs", "ec2", "sts", "eks", "sqs"]
 }
 
 variable "domain_name_servers" {
-  type = list(string) 
+  type        = list(string)
   description = "Domain name servers for VPC (opt)"
-  default = []
+  default     = []
 }
 
 variable "private_subnets_count" {
-  type = number
+  type        = number
   description = "Number of private subnets (opt)"
-  default = 2
+  default     = 2
 }
 
 variable "public_subnets_count" {
-  type = number
+  type        = number
   description = "Number of public subnets (opt)"
-  default = 0
+  default     = 0
+}
+
+variable "public_ingress_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed to access public subnets (SSH/HTTPS)"
+  default     = []
+}
+
+variable "internal_ingress_cidrs" {
+  type        = list(string)
+  description = "Internal CIDRs allowed for east-west traffic"
+  default     = []
 }
 
 variable "create_nat" {
-  type = bool
+  type        = bool
   description = "Create and attach NAT to private subnets (opt)"
-  default = false
+  default     = false
 }
 
 variable "create_igw" {
-  type = bool
+  type        = bool
   description = "Create and attach IGW to publice subnets (opt)"
-  default = false
+  default     = false
 }
 
 variable "transit_gateway" {
-  type = string
+  type        = string
   description = "Transit gateway id (opt)"
-  default = ""
+  default     = ""
 }
 
 variable "ipv4_ipam_pool_id" {
-  type = string
+  type        = string
   description = "IPAM Pool Id"
 }
 
 variable "ipv4_netmask_length" {
-  type = number
+  type        = number
   description = "Netmask for PVC"
-  default = 24
+  default     = 24
 }
 
 variable "tags" {
-  type = map(string)
+  type        = map(string)
   description = "Tags (opt)"
-  default = {}
+  default     = {}
 }
 
 

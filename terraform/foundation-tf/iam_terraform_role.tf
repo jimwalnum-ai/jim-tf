@@ -1,12 +1,12 @@
 resource "aws_iam_role" "terraform_role" {
-  name                  = "cs-terraform-role"
-  description           = "Role for allowing terraform actions on AWS"
-  assume_role_policy    = data.template_file.assume_role_policy.rendered
-  tags 			= local.tags
+  name               = "cs-terraform-role"
+  description        = "Role for allowing terraform actions on AWS"
+  assume_role_policy = data.template_file.assume_role_policy.rendered
+  tags               = local.tags
 }
 
 data "template_file" "terraform_policy" {
-  template = "${file("./templates/terraform_policy.json.tpl")}"
+  template = file("./templates/terraform_policy.json.tpl")
 }
 
 resource "aws_iam_policy" "role_terraform_policy" {
@@ -16,7 +16,7 @@ resource "aws_iam_policy" "role_terraform_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "role_terraform_policy" {
-  role        = aws_iam_role.terraform_role.name
-  policy_arn  = aws_iam_policy.role_terraform_policy.arn
+  role       = aws_iam_role.terraform_role.name
+  policy_arn = aws_iam_policy.role_terraform_policy.arn
 }
 
