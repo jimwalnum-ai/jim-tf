@@ -1,0 +1,40 @@
+data "aws_caller_identity" "current" {}
+
+locals  {
+  state_bucket_name = "cs-use1-terraform-state-2"
+  #tagmap     = csvdecode(file("../tags.csv"))
+  #tgs        = { for rg in local.tagmap : rg.tag => rg.value }
+  #top_tagmap = csvdecode(file("../../top_level_tags.csv"))
+  #top_tgs    = { for rg in local.top_tagmap : rg.tag => rg.value }
+  # Can define a specific local.tf in the directory to set application, other tags
+  date_tag      = { "create_date" : formatdate("MM-DD-YYYY hh:mm:ssZ", time_static.date.rfc3339) }
+  ws            = split("/", "${path.cwd}")
+  app           = element(local.ws, length(local.ws) - 1)
+  tf_src        = format("%s/%s", element(local.ws, length(local.ws) - 2), element(local.ws, length(local.ws) - 1))
+  extra_tags    = { "application" : local.app, "source" : local.tf_src }
+  all_tags      = merge(local.extra_tags, local.date_tag)
+  # Can define a specific local.tf in the directory to set application, other tags
+  acct_name = element(local.ws, length(local.ws) - 2)
+  acct_id   =  data.aws_caller_identity.current.account_id
+  tags = local.all_tags
+}
+
+resource "time_static" "date" {}
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "=5.6.2"
+    }
+    awscc = {
+      source = "hashicorp/awscc"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+

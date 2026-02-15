@@ -1,0 +1,17 @@
+# define ldif file with record arrtributes
+# file saved with cs.lfip
+dn: uid=onion1,dc=crimsonscallion,dc=com
+uid: onion1
+cn: onion1
+sn: 3
+objectClass: top
+objectClass: posixAccount
+objectClass: inetOrgPerson
+loginShell: /bin/bash
+homeDirectory: /home/onion1
+uidNumber: 14583102
+gidNumber: 14564100
+userPassword: {SHA}b6iwqwFcExALkQcwemb3F+na9PQ=
+mail: onion@crimsonscallion.com
+gecos: Head Onion
+

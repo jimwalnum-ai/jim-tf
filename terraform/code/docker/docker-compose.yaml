@@ -1,0 +1,12 @@
+version: '2'
+services:
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: ldap
+    environment:
+        - LDAP_ORGANISATION=crimsonscallion
+        - LDAP_DOMAIN=crimsonscallion.com
+        - LDAP_BASE_DN=dc=crimsonscallion,dc=com
+    ports:
+        - 389:389
+        - 636:636
