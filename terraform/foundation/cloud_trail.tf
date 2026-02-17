@@ -2,6 +2,7 @@ resource "aws_cloudtrail" "cs" {
   name                          = "cs-cloudtrail"
   s3_bucket_name                = module.s3-cloudtrail.bucket_name
   include_global_service_events = false
+  depends_on                    = [aws_s3_bucket_policy.cloudtrail]
 }
 
 module "s3-cloudtrail" {
