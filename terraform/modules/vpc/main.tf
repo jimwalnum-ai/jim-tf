@@ -1,8 +1,18 @@
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+data "aws_caller_identity" "current" {}
+
 locals {
   env_name             = "${var.name}-${var.env}"
   flow_log_bucket_name = "vpc-${var.name}-${var.env}-flow-logs"
   tag_name             = lookup(aws_vpc.vpc.tags, "Name")
-  azs                  = [for i in range(var.private_subnets_count) : format("%s%s", var.region, i < 3 ? ["a", "b", "c"][i] : "")]
+  requested_azs_count  = max(var.private_subnets_count, var.public_subnets_count)
+  default_azs          = sort(data.aws_availability_zones.available.names)
+  azs_source           = length(var.availability_zones) > 0 ? var.availability_zones : local.default_azs
+  azs                  = slice(local.azs_source, 0, local.requested_azs_count)
+  endpoint_subnet_ids  = length(var.endpoint_subnet_ids) > 0 ? var.endpoint_subnet_ids : aws_subnet.tgw_subnets[*].id
   internal_ingress_cidrs_map = merge(
     { "vpc" = { cidr = aws_vpc.vpc.cidr_block, rule_offset = 0 } },
     { for idx, cidr in var.internal_ingress_cidrs : "internal-${idx}" => { cidr = cidr, rule_offset = idx + 1 } }
@@ -51,16 +61,6 @@ resource "aws_network_acl" "private_acl" {
   }
 }
 
-resource "aws_network_acl_rule" "public_inbound_internal" {
-  for_each       = local.internal_ingress_cidrs_map
-  network_acl_id = aws_network_acl.public_acl.id
-  rule_number    = 100 + each.value.rule_offset
-  egress         = false
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = each.value.cidr
-}
-
 resource "aws_network_acl_rule" "public_inbound_ssh" {
   for_each       = local.public_ingress_cidrs_map
   network_acl_id = aws_network_acl.public_acl.id
@@ -85,15 +85,16 @@ resource "aws_network_acl_rule" "public_inbound_https" {
   to_port        = 443
 }
 
-resource "aws_network_acl_rule" "public_inbound_ephemeral" {
+resource "aws_network_acl_rule" "public_inbound_postgres" {
+  for_each       = local.public_ingress_cidrs_map
   network_acl_id = aws_network_acl.public_acl.id
-  rule_number    = 400
+  rule_number    = 400 + each.value
   egress         = false
   protocol       = "tcp"
   rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 1024
-  to_port        = 65535
+  cidr_block     = each.key
+  from_port      = 5432
+  to_port        = 5432
 }
 
 resource "aws_network_acl_rule" "public_outbound_internal" {
@@ -187,7 +188,7 @@ resource "aws_subnet" "tgw_subnets" {
   vpc_id            = aws_vpc.vpc.id
   cidr_block        = cidrsubnet(aws_vpc.vpc.cidr_block, 3, count.index)
   availability_zone = local.azs[count.index]
-  tags              = merge(var.tags, { Name = "${local.env_name}-tgw-subnet-${local.azs[count.index]}", scope = "private", type = "tgw" })
+  tags              = merge(var.tags, var.tgw_subnet_tags, { Name = "${local.env_name}-tgw-subnet-${local.azs[count.index]}", scope = "private", type = "tgw" })
 }
 
 resource "aws_subnet" "protected_subnets" {
@@ -302,11 +303,13 @@ resource "aws_security_group" "endpoints" {
 }
 
 resource "aws_vpc_endpoint" "endpoints" {
-  for_each           = toset(var.endpoint_list)
-  vpc_id             = aws_vpc.vpc.id
-  service_name       = "com.amazonaws.${var.region}.${each.value}"
-  vpc_endpoint_type  = "Interface"
-  security_group_ids = [aws_security_group.endpoints.id]
+  for_each            = toset(var.endpoint_list)
+  vpc_id              = aws_vpc.vpc.id
+  service_name        = "com.amazonaws.${var.region}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  security_group_ids  = [aws_security_group.endpoints.id]
+  subnet_ids          = local.endpoint_subnet_ids
+  private_dns_enabled = true
   tags = {
     Name = "${local.env_name}-${each.value}-interface"
   }
@@ -315,7 +318,10 @@ resource "aws_vpc_endpoint" "endpoints" {
 resource "aws_vpc_endpoint_policy" "policy" {
   for_each        = setsubtract(toset(var.endpoint_list), ["eks"])
   vpc_endpoint_id = aws_vpc_endpoint.endpoints[each.value].id
-  policy          = templatefile("${path.module}/templates/endpoint_policy.json.tpl", { user = var.endpoint_access_role })
+  policy = templatefile("${path.module}/templates/endpoint_policy.json.tpl", {
+    user       = var.endpoint_access_role
+    account_id = data.aws_caller_identity.current.account_id
+  })
 }
 
 

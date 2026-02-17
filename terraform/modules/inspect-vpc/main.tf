@@ -22,6 +22,13 @@ resource "aws_vpc" "vpc" {
   tags                 = merge(var.tags, { "Name" : "${local.env_name}-vpc" })
 }
 
+resource "aws_flow_log" "vpc_flow_log" {
+  log_destination      = var.flow_log_bucket
+  log_destination_type = "s3"
+  traffic_type         = "ALL"
+  vpc_id               = aws_vpc.vpc.id
+}
+
 resource "aws_subnet" "inspection_vpc_firewall_subnet" {
   count                   = 2
   availability_zone       = data.aws_availability_zones.available.names[count.index]

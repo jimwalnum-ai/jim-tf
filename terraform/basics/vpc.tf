@@ -40,8 +40,12 @@ module "vpc-dev" {
   endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
   internal_ingress_cidrs = ["10.0.0.0/8"]
-  tags                   = local.tags
-  depends_on             = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
+  tgw_subnet_tags = {
+    "kubernetes.io/cluster/eks-cluster-dev" = "shared"
+    "kubernetes.io/role/internal-elb"       = "1"
+  }
+  tags       = local.tags
+  depends_on = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
 }
 
 module "vpc-prd" {
@@ -57,8 +61,12 @@ module "vpc-prd" {
   endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
   internal_ingress_cidrs = ["10.0.0.0/8"]
-  tags                   = local.tags
-  depends_on             = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
+  tgw_subnet_tags = {
+    "kubernetes.io/cluster/eks-cluster-prd" = "shared"
+    "kubernetes.io/role/internal-elb"       = "1"
+  }
+  tags       = local.tags
+  depends_on = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
 }
 
 #module "vpc-egress" {

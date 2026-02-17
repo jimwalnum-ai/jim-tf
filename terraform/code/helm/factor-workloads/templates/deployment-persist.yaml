@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "factor-workloads.fullname" . }}-persist
+  labels:
+    {{- include "factor-workloads.labels" . | nindent 4 }}
+    app.kubernetes.io/component: persist
+spec:
+  replicas: {{ .Values.persist.replicas }}
+  selector:
+    matchLabels:
+      {{- include "factor-workloads.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: persist
+  template:
+    metadata:
+      labels:
+        {{- include "factor-workloads.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: persist
+    spec:
+      serviceAccountName: {{ include "factor-workloads.serviceAccountName" . }}
+      containers:
+        - name: persist
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 "urllib3<2.0" psycopg2-binary &&
+              python {{ .Values.scripts.mountPath }}/persist.py
+          {{- with .Values.common.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.persist.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: scripts
+              mountPath: {{ .Values.scripts.mountPath }}
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "factor-workloads.fullname" . }}-scripts

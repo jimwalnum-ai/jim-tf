@@ -13,6 +13,16 @@ variable "region" {
   description = "VPC Region"
 }
 
+variable "availability_zones" {
+  type        = list(string)
+  description = "Optional ordered list of AZs to use (defaults to available zones in provider region)"
+  default     = []
+  validation {
+    condition     = length(var.availability_zones) == 0 || length(var.availability_zones) >= max(var.private_subnets_count, var.public_subnets_count)
+    error_message = "availability_zones must be empty or contain at least max(private_subnets_count, public_subnets_count) entries."
+  }
+}
+
 variable "flow_log_bucket" {
   type        = string
   description = "Flow log bucket arn"
@@ -31,7 +41,13 @@ variable "test" {
 variable "endpoint_list" {
   type        = list(string)
   description = "List of VPC endpoints to create, s3 endpoint is automatic (opt)"
-  default     = ["ecr.api", "ecr.dkr", "logs", "ec2", "sts", "eks", "sqs"]
+  default     = ["ecr.api", "ecr.dkr", "logs", "ec2", "sts", "eks", "sqs", "ssm", "ssmmessages", "ec2messages"]
+}
+
+variable "endpoint_subnet_ids" {
+  type        = list(string)
+  description = "Subnet IDs for interface VPC endpoints (defaults to TGW subnets)."
+  default     = []
 }
 
 variable "domain_name_servers" {
@@ -96,6 +112,12 @@ variable "ipv4_netmask_length" {
 variable "tags" {
   type        = map(string)
   description = "Tags (opt)"
+  default     = {}
+}
+
+variable "tgw_subnet_tags" {
+  type        = map(string)
+  description = "Additional tags for TGW subnets (opt)"
   default     = {}
 }
 

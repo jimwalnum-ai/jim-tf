@@ -1,6 +1,6 @@
 module "backend-kms-key" {
   source   = "../modules/kms"
-  key_name = "csz1-use1-backend-s3-kms"
+  key_name = "${local.prefix}-use1-backend-s3-kms"
   readonly_roles = ["arn:aws:iam::${local.acct_id}:root",
   "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"]
   write_roles = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]

@@ -4,7 +4,7 @@ data "aws_region" "current" {}
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csz1"
+  prefix            = "csz3"
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }
   top_tagmap        = csvdecode(file("../top_level_tags.csv"))

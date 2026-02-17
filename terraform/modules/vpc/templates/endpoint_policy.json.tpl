@@ -5,7 +5,7 @@
       "Sid": "ReadWriteAccess",
       "Effect": "Allow",
       "Principal": {
-                "AWS": ["${user}"]
+                "AWS": ["${user}", "arn:aws:iam::${account_id}:root"]
             },
       "Action": "*",
       "Resource": "*"

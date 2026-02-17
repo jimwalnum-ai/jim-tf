@@ -35,7 +35,10 @@ data "aws_iam_policy_document" "cloudtrail" {
       type        = "AWS"
       identifiers = ["*"]
     }
-    resources = ["${module.s3-cloudtrail.bucket_arn}"]
+    resources = [
+      "${module.s3-cloudtrail.bucket_arn}",
+      "${module.s3-cloudtrail.bucket_arn}/*"
+    ]
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
@@ -54,6 +57,11 @@ data "aws_iam_policy_document" "cloudtrail" {
 
     actions   = ["s3:PutObject"]
     resources = ["${module.s3-cloudtrail.bucket_arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
   }
 }
 
