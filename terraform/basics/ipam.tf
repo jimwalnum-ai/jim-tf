@@ -3,7 +3,7 @@ data "aws_region" "current" {}
 resource "aws_vpc_ipam" "cs-main" {
   description = "cs-ipam"
   operating_regions {
-    region_name = data.aws_region.current.name
+    region_name = data.aws_region.current.id
   }
 }
 
@@ -20,10 +20,10 @@ resource "aws_vpc_ipam_pool_cidr" "top_level" {
 }
 
 resource "aws_vpc_ipam_pool" "regional" {
-  description         = "${data.aws_region.current.name}-1-pool"
+  description         = "${data.aws_region.current.id}-1-pool"
   address_family      = "ipv4"
   ipam_scope_id       = aws_vpc_ipam.cs-main.private_default_scope_id
-  locale              = data.aws_region.current.name
+  locale              = data.aws_region.current.id
   source_ipam_pool_id = aws_vpc_ipam_pool.top_level.id
   depends_on          = [aws_vpc_ipam_pool.top_level]
 }

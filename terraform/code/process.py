@@ -1,5 +1,8 @@
-import boto3, datetime, time
+import boto3, datetime, time, os, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
 
 def do_factor(in_num):
     if in_num <= 1:
@@ -19,18 +22,30 @@ def do_factor(in_num):
 # Create SQS client
 sqs = boto3.client('sqs', region_name="us-east-1")
 
-queue_url = 'SQS_FACTOR_DEV'
-send_queue_url = 'SQS_FACTOR_RESULT_DEV'
+QUEUE_NAME = os.getenv("FACTOR_QUEUE_NAME", "SQS_FACTOR_DEV")
+RESULT_QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
+VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
 MAX_WORKERS = 8
 
+def _resolve_queue_url(queue_name_or_url):
+    if queue_name_or_url.startswith("https://"):
+        return queue_name_or_url
+    return sqs.get_queue_url(QueueName=queue_name_or_url)["QueueUrl"]
+
+
+queue_url = _resolve_queue_url(QUEUE_NAME)
+send_queue_url = _resolve_queue_url(RESULT_QUEUE_NAME)
+
+
 def _build_entries(index, message):
-    start = time.perf_counter()
+    start_ns = time.perf_counter_ns()
     factor = int(message["MessageAttributes"]["Factor"]["StringValue"])
     scheme = int(message["MessageAttributes"]["Scheme"]["StringValue"])
     sent_time = int(message["Attributes"]["SentTimestamp"])
     seq = message["MessageId"]
     factor_list = do_factor(factor)
-    ms = int((time.perf_counter() - start) * 1000)
+    elapsed_ns = time.perf_counter_ns() - start_ns
+    ms = max(1, int((elapsed_ns + 500_000) // 1_000_000))
 
     send_entry = {
         'Id': str(index),
@@ -77,7 +92,7 @@ i = 0
 while not done:
     i += 1
     if i % 100 == 0:
-        print(i)
+        logger.info("poll_count=%s", i)
     response = sqs.receive_message(
         QueueUrl=queue_url,
         AttributeNames=[
@@ -87,13 +102,16 @@ while not done:
         MessageAttributeNames=[
             'All'
         ],
-        VisibilityTimeout=0,
+        VisibilityTimeout=VISIBILITY_TIMEOUT_SECONDS,
         WaitTimeSeconds=20
     )
 
     messages = response.get('Messages', [])
     if not messages:
+        logger.info("no_messages_received")
         break
+
+    logger.info("received_messages=%s", len(messages))
 
     send_entries = [None] * len(messages)
     delete_entries = [None] * len(messages)
@@ -107,13 +125,22 @@ while not done:
             delete_entries[index] = delete_entry
 
     # Send results to persist (batch)
-    sqs.send_message_batch(
+    send_response = sqs.send_message_batch(
         QueueUrl=send_queue_url,
         Entries=send_entries
     )
+    failed_send = send_response.get("Failed", [])
+    if failed_send:
+        logger.error("send_failures=%s", failed_send)
+        failed_ids = {entry["Id"] for entry in failed_send}
+        delete_entries = [entry for entry in delete_entries if entry["Id"] not in failed_ids]
+    else:
+        logger.info("sent_messages=%s", len(send_entries))
 
-    # Delete received messages from queue (batch)
-    sqs.delete_message_batch(
-        QueueUrl=queue_url,
-        Entries=delete_entries
-    )
+    if delete_entries:
+        # Delete received messages from queue (batch)
+        sqs.delete_message_batch(
+            QueueUrl=queue_url,
+            Entries=delete_entries
+        )
+        logger.info("deleted_messages=%s", len(delete_entries))

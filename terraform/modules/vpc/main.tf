@@ -97,6 +97,17 @@ resource "aws_network_acl_rule" "public_inbound_postgres" {
   to_port        = 5432
 }
 
+resource "aws_network_acl_rule" "public_inbound_ephemeral" {
+  network_acl_id = aws_network_acl.public_acl.id
+  rule_number    = 500
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+
 resource "aws_network_acl_rule" "public_outbound_internal" {
   for_each       = local.internal_ingress_cidrs_map
   network_acl_id = aws_network_acl.public_acl.id

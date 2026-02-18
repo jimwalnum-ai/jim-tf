@@ -24,6 +24,11 @@ resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
 }
 
+resource "aws_iam_role_policy_attachment" "cluster_service_policy" {
+  role       = aws_iam_role.cluster.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+}
+
 data "aws_iam_policy_document" "node_assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -55,6 +60,21 @@ resource "aws_iam_role_policy_attachment" "ecr_readonly_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy_attachment" "ebs_csi_policy" {
+  role       = aws_iam_role.node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "efs_csi_policy" {
+  role       = aws_iam_role.node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent_policy" {
+  role       = aws_iam_role.node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 resource "aws_eks_cluster" "cluster" {
   name     = var.cluster_name
   version  = var.kubernetes_version
@@ -73,7 +93,8 @@ resource "aws_eks_cluster" "cluster" {
 
   depends_on = [
     aws_iam_role_policy_attachment.cluster_policy,
-    aws_iam_role_policy_attachment.cluster_vpc_resource_controller
+    aws_iam_role_policy_attachment.cluster_vpc_resource_controller,
+    aws_iam_role_policy_attachment.cluster_service_policy
   ]
 }
 
@@ -102,6 +123,9 @@ resource "aws_eks_node_group" "default" {
   depends_on = [
     aws_iam_role_policy_attachment.worker_node_policy,
     aws_iam_role_policy_attachment.cni_policy,
-    aws_iam_role_policy_attachment.ecr_readonly_policy
+    aws_iam_role_policy_attachment.ecr_readonly_policy,
+    aws_iam_role_policy_attachment.ebs_csi_policy,
+    aws_iam_role_policy_attachment.efs_csi_policy,
+    aws_iam_role_policy_attachment.cloudwatch_agent_policy
   ]
 }

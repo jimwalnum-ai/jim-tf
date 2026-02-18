@@ -4,7 +4,8 @@ data "aws_partition" "current" {}
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csz3"
+  prefix            = "csz"
+  env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }
   top_tagmap        = csvdecode(file("../top_level_tags.csv"))
@@ -27,7 +28,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "=5.6.2"
+      version = ">5.95.0"
     }
     awscc = {
       source = "hashicorp/awscc"
