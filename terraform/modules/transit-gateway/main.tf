@@ -1,7 +1,7 @@
 resource "aws_ec2_transit_gateway" "tgw" {
   description                     = "Transit Gateway"
-  default_route_table_association = "enable"
-  default_route_table_propagation = "enable"
+  default_route_table_association = "disable"
+  default_route_table_propagation = "disable"
   tags                            = merge(var.tags, { "Name" : "tgw-${var.env}" })
 }
 

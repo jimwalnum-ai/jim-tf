@@ -2,6 +2,8 @@ locals {
   access_roles = concat(var.write_roles)
 }
 
+data "aws_region" "current" {}
+
 resource "aws_kms_key" "kms_key" {
   description             = var.key_name
   deletion_window_in_days = 7
@@ -19,6 +21,7 @@ data "template_file" "kms_key_policy" {
   vars = {
     write_resources   = "${jsonencode(local.access_roles)}"
     allowed_resources = "${jsonencode(concat(var.readonly_roles, local.access_roles))}"
+    region            = data.aws_region.current.id
   }
 }
 

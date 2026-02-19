@@ -51,6 +51,7 @@ data "aws_subnets" "public_selected" {
   }
 }
 
+
 locals {
   ecs_cluster_name        = var.ecs_cluster_name != null && var.ecs_cluster_name != "" ? var.ecs_cluster_name : "ecs-factor-${var.env}"
   ecs_pip_install_command = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
@@ -111,6 +112,7 @@ resource "aws_security_group" "ecs_tasks" {
 
   tags = local.tags
 }
+
 
 resource "aws_cloudwatch_log_group" "process" {
   name = "/ecs/${local.ecs_cluster_name}/process"
@@ -236,7 +238,7 @@ resource "aws_ecs_service" "process" {
   name            = "${local.ecs_cluster_name}-process"
   cluster         = aws_ecs_cluster.factor.id
   task_definition = aws_ecs_task_definition.process.arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -250,7 +252,7 @@ resource "aws_ecs_service" "persist" {
   name            = "${local.ecs_cluster_name}-persist"
   cluster         = aws_ecs_cluster.factor.id
   task_definition = aws_ecs_task_definition.persist.arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -264,7 +266,7 @@ resource "aws_ecs_service" "test_msg" {
   name            = "${local.ecs_cluster_name}-test-msg"
   cluster         = aws_ecs_cluster.factor.id
   task_definition = aws_ecs_task_definition.test_msg.arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -287,9 +289,9 @@ resource "aws_cloudwatch_event_target" "test_msg" {
   role_arn  = aws_iam_role.ecs_events.arn
 
   ecs_target {
-    launch_type         = "FARGATE"
     task_definition_arn = aws_ecs_task_definition.test_msg.arn
     task_count          = 1
+    launch_type         = "FARGATE"
     network_configuration {
       subnets          = data.aws_subnets.public_selected.ids
       security_groups  = [aws_security_group.ecs_tasks.id]

@@ -2,6 +2,9 @@ locals {
   env_name             = "vpc-${var.name}-${var.env}-cs"
   flow_log_bucket_name = "vpc-${var.name}-${var.env}-flow-logs"
   tag_name             = lookup(aws_vpc.vpc.tags, "Name")
+  default_azs          = sort(data.aws_availability_zones.available.names)
+  azs_source           = length(var.availability_zones) > 0 ? var.availability_zones : local.default_azs
+  available_azs        = slice(local.azs_source, 0, 2)
   internal_ingress_cidrs_map = merge(
     { "vpc" = { cidr = aws_vpc.vpc.cidr_block, rule_offset = 0 } },
     { "super" = { cidr = var.super_cidr_block, rule_offset = 1 } },
@@ -31,30 +34,30 @@ resource "aws_flow_log" "vpc_flow_log" {
 
 resource "aws_subnet" "inspection_vpc_firewall_subnet" {
   count                   = 2
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  availability_zone       = local.available_azs[count.index]
   cidr_block              = cidrsubnet(aws_vpc.vpc.cidr_block, 4, count.index)
   vpc_id                  = aws_vpc.vpc.id
   map_public_ip_on_launch = false
-  tags                    = merge(var.tags, { Name = "${local.env_name}-firewall-subnet-${data.aws_availability_zones.available.names[count.index]}", scope = "private" })
+  tags                    = merge(var.tags, { Name = "${local.env_name}-firewall-subnet-${local.available_azs[count.index]}", scope = "private" })
 }
 
 resource "aws_subnet" "inspection_vpc_public_subnet" {
   count                   = 2
   map_public_ip_on_launch = true
   vpc_id                  = aws_vpc.vpc.id
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  availability_zone       = local.available_azs[count.index]
   cidr_block              = cidrsubnet(aws_vpc.vpc.cidr_block, 4, 2 + count.index)
   depends_on              = [aws_internet_gateway.inspection_vpc_igw]
-  tags                    = merge(var.tags, { Name = "${local.env_name}-public-subnet-${data.aws_availability_zones.available.names[count.index]}", scope = "public" })
+  tags                    = merge(var.tags, { Name = "${local.env_name}-public-subnet-${local.available_azs[count.index]}", scope = "public" })
 
 }
 resource "aws_subnet" "inspection_vpc_tgw_subnet" {
   count                   = 2
   map_public_ip_on_launch = false
   vpc_id                  = aws_vpc.vpc.id
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  availability_zone       = local.available_azs[count.index]
   cidr_block              = cidrsubnet(aws_vpc.vpc.cidr_block, 4, var.tgw_subnet_cidr_offset + count.index)
-  tags                    = merge(var.tags, { Name = "${local.env_name}-tgw-subnet-${data.aws_availability_zones.available.names[count.index]}", scope = "private" })
+  tags                    = merge(var.tags, { Name = "${local.env_name}-tgw-subnet-${local.available_azs[count.index]}", scope = "private" })
 }
 
 resource "aws_network_acl" "public_acl" {
@@ -235,7 +238,7 @@ resource "aws_nat_gateway" "inspection_vpc_nat_gw" {
   allocation_id = aws_eip.inspection_vpc_nat_gw_eip[count.index].id
   subnet_id     = aws_subnet.inspection_vpc_public_subnet[count.index].id
   tags = {
-    Name = "inspection-vpc/${data.aws_availability_zones.available.names[count.index]}/nat-gateway"
+    Name = "inspection-vpc/${local.available_azs[count.index]}/nat-gateway"
   }
 }
 
@@ -251,7 +254,7 @@ resource "aws_route_table" "inspection_vpc_firewall_subnet_route_table" {
     nat_gateway_id = aws_nat_gateway.inspection_vpc_nat_gw[count.index].id
   }
   tags = {
-    Name = "inspection-vpc/${data.aws_availability_zones.available.names[count.index]}/firewall-subnet-route-table"
+    Name = "inspection-vpc/${local.available_azs[count.index]}/firewall-subnet-route-table"
   }
 }
 

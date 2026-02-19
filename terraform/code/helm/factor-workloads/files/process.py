@@ -38,14 +38,13 @@ send_queue_url = _resolve_queue_url(RESULT_QUEUE_NAME)
 
 
 def _build_entries(index, message):
-    start_ns = time.perf_counter_ns()
+    pulled_time_ms = int(time.time() * 1000)
     factor = int(message["MessageAttributes"]["Factor"]["StringValue"])
     scheme = int(message["MessageAttributes"]["Scheme"]["StringValue"])
     sent_time = int(message["Attributes"]["SentTimestamp"])
     seq = message["MessageId"]
     factor_list = do_factor(factor)
-    elapsed_ns = time.perf_counter_ns() - start_ns
-    ms = max(1, int((elapsed_ns + 500_000) // 1_000_000))
+    ms = max(0, pulled_time_ms - sent_time)
 
     send_entry = {
         'Id': str(index),
@@ -58,6 +57,10 @@ def _build_entries(index, message):
             'SentTime': {
                 'DataType': 'String',
                 'StringValue': str(sent_time)
+            },
+            'PulledTime': {
+                'DataType': 'String',
+                'StringValue': str(pulled_time_ms)
             },
             'Sequence': {
                 'DataType': 'String',

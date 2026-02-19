@@ -93,6 +93,8 @@ while not done:
  try:
    message = response['Messages'][0]
  except: break
+ pull_start = time.monotonic()
+ pulled_at_ms = int(time.time() * 1000)
  receipt_handle = message['ReceiptHandle']
  msg_json = message["MessageAttributes"]
  fetch_started = time.monotonic()
@@ -102,14 +104,27 @@ while not done:
  scheme = int(msg_json["Scheme"]["StringValue"])
  sequence_raw = msg_json.get("Sequence", {}).get("StringValue")
  sent_time_raw = msg_json.get("SentTime", {}).get("StringValue")
+ pulled_time_raw = msg_json.get("PulledTime", {}).get("StringValue")
  result =  literal_eval(msg_json["Result"]["StringValue"])
  ms = int((time.monotonic() - fetch_started) * 1000)
- data = {"factor":int(msg_json["Factor"]["StringValue"]),"result":result,"scheme":scheme,"ms":ms}
+ queue_to_db_ms = int((time.monotonic() - pull_start) * 1000)
+ persisted_at_ms = int(time.time() * 1000)
+ if pulled_time_raw and pulled_time_raw.isdigit():
+  pull_to_persist_ms = persisted_at_ms - int(pulled_time_raw)
+ else:
+  pull_to_persist_ms = persisted_at_ms - pulled_at_ms
+ data = {"factor":int(msg_json["Factor"]["StringValue"]),"result":result,"scheme":scheme,"ms":ms,"queue_to_db_ms":queue_to_db_ms,"pulled_at_ms":pulled_at_ms,"persisted_at_ms":persisted_at_ms,"pull_to_persist_ms":pull_to_persist_ms}
 
  if sequence_raw:
   data["sequence_raw"] = sequence_raw
  if sent_time_raw:
   data["sent_time"] = sent_time_raw
+  if sent_time_raw.isdigit():
+   persisted_at_ms = int(time.time() * 1000)
+   data["sent_to_persist_ms"] = persisted_at_ms - int(sent_time_raw)
+
+ if pulled_time_raw:
+  data["pulled_time"] = pulled_time_raw
 
  sequence = _uuid7(sent_time_raw if sent_time_raw and sent_time_raw.isdigit() else process_time)
  cur.execute('INSERT INTO factors (sequence, data) VALUES (%s, %s)', (sequence, json.dumps(data)) )

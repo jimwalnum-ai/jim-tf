@@ -110,6 +110,9 @@ while not done:
   data["sequence_raw"] = sequence_raw
  if sent_time_raw:
   data["sent_time"] = sent_time_raw
+  if sent_time_raw.isdigit():
+   persisted_at_ms = int(time.time() * 1000)
+   data["sent_to_persist_ms"] = persisted_at_ms - int(sent_time_raw)
 
  sequence = _uuid7(sent_time_raw if sent_time_raw and sent_time_raw.isdigit() else process_time)
  cur.execute('INSERT INTO factors (sequence, data) VALUES (%s, %s)', (sequence, json.dumps(data)) )

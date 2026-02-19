@@ -8,10 +8,13 @@
 #}
 
 module "s3-sqs" {
-  source        = "../modules/s3"
-  bucket_name   = "${local.prefix}-use1-sqs-data-bucket-1"
-  bucket_policy = ""
-  tags          = local.tags
+  source          = "../modules/s3"
+  bucket_name     = "${local.prefix}-use1-sqs-data-bucket-1"
+  bucket_policy   = ""
+  kms_key         = module.core-kms-key.kms_key_arn
+  versioning      = "Enabled"
+  life_cycle_term = "short-term"
+  tags            = local.tags
 }
 
 data "template_file" "s3_sqs_policy" {

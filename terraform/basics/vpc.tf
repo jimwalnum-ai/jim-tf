@@ -7,6 +7,10 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+locals {
+  available_azs = sort(data.aws_availability_zones.available.names)
+}
+
 module "core-kms-key" {
   source         = "../modules/kms"
   key_name       = "cs-core-kms"
@@ -93,6 +97,7 @@ module "vpc-inspect" {
   name                   = "cs-basics"
   env                    = "inspect"
   region                 = "us-east-1"
+  availability_zones     = local.available_azs
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
   transit_gateway        = module.tgw.id
   super_cidr_block       = "10.0.0.0/18"
@@ -110,7 +115,7 @@ resource "aws_route_table" "inspection_vpc_tgw_subnet_route_table" {
     vpc_endpoint_id = element([for ss in aws_networkfirewall_firewall.inspection_vpc_fw.firewall_status[0].sync_states : ss.attachment[0].endpoint_id if ss.attachment[0].subnet_id == module.vpc-inspect.firewall_subnets[count.index].id], 0)
   }
   tags = {
-    Name = "inspection-vpc/${data.aws_availability_zones.available.names[count.index]}/tgw-subnet-route-table"
+    Name = "inspection-vpc/${local.available_azs[count.index]}/tgw-subnet-route-table"
   }
   depends_on = [aws_networkfirewall_firewall.inspection_vpc_fw]
 }
@@ -133,7 +138,7 @@ resource "aws_route_table" "inspection_vpc_firewall_subnet_route_table" {
     nat_gateway_id = module.vpc-inspect.nat_gateways[count.index].id
   }
   tags = {
-    Name = "inspection-vpc/${data.aws_availability_zones.available.names[count.index]}/firewall-subnet-route-table"
+    Name = "inspection-vpc/${local.available_azs[count.index]}/firewall-subnet-route-table"
   }
 }
 
@@ -156,7 +161,7 @@ resource "aws_route_table" "inspection_vpc_public_subnet_route_table" {
   }
 
   tags = {
-    Name = "inspection-vpc/${data.aws_availability_zones.available.names[count.index]}/public-subnet-route-table"
+    Name = "inspection-vpc/${local.available_azs[count.index]}/public-subnet-route-table"
   }
   depends_on = [aws_networkfirewall_firewall.inspection_vpc_fw]
 }
@@ -169,19 +174,23 @@ resource "aws_route_table_association" "inspection_vpc_public_subnet_route_table
 
 
 resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-dev" {
-  subnet_ids         = module.vpc-dev.tgw_subnets
-  transit_gateway_id = module.tgw.id
-  vpc_id             = module.vpc-dev.vpc_id
-  depends_on         = [module.tgw]
-  tags               = local.tags
+  subnet_ids                                      = module.vpc-dev.tgw_subnets
+  transit_gateway_id                              = module.tgw.id
+  vpc_id                                          = module.vpc-dev.vpc_id
+  transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_propagation = false
+  depends_on                                      = [module.tgw]
+  tags                                            = local.tags
 }
 
 resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-prd" {
-  subnet_ids         = module.vpc-prd.tgw_subnets
-  transit_gateway_id = module.tgw.id
-  vpc_id             = module.vpc-prd.vpc_id
-  depends_on         = [module.tgw]
-  tags               = local.tags
+  subnet_ids                                      = module.vpc-prd.tgw_subnets
+  transit_gateway_id                              = module.tgw.id
+  vpc_id                                          = module.vpc-prd.vpc_id
+  transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_propagation = false
+  depends_on                                      = [module.tgw]
+  tags                                            = local.tags
 }
 
 #resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-egress" {
@@ -193,11 +202,43 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-prd" {
 #}
 
 resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-inspect" {
-  subnet_ids         = module.vpc-inspect.tgw_subnets.*.id
-  transit_gateway_id = module.tgw.id
-  vpc_id             = module.vpc-inspect.vpc_id
-  depends_on         = [module.tgw]
-  tags               = local.tags
+  subnet_ids                                      = module.vpc-inspect.tgw_subnets.*.id
+  transit_gateway_id                              = module.tgw.id
+  vpc_id                                          = module.vpc-inspect.vpc_id
+  transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_propagation = false
+  depends_on                                      = [module.tgw]
+  tags                                            = local.tags
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "vpc_dev_association" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
+  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "vpc_prd_association" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-prd.id
+  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_association" "vpc_inspect_association" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
+  transit_gateway_route_table_id = module.tgw.inspection_route_table.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_dev_propagation" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
+  transit_gateway_route_table_id = module.tgw.inspection_route_table.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_prd_propagation" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-prd.id
+  transit_gateway_route_table_id = module.tgw.inspection_route_table.id
+}
+
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_propagation" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
+  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
 }
 
 resource "aws_ec2_transit_gateway_route" "internet" {

@@ -13,6 +13,16 @@ variable "region" {
   description = "VPC Region"
 }
 
+variable "availability_zones" {
+  type        = list(string)
+  description = "Optional ordered list of AZs to use (defaults to available zones in provider region)"
+  default     = []
+  validation {
+    condition     = length(var.availability_zones) == 0 || length(var.availability_zones) >= 2
+    error_message = "availability_zones must be empty or contain at least 2 entries."
+  }
+}
+
 variable "flow_log_bucket" {
   type        = string
   description = "Flow log bucket arn"

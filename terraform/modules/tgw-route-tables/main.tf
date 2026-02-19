@@ -32,6 +32,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "inspection_vpc_tgw_attachment
   transit_gateway_id                              = var.tgw_id
   vpc_id                                          = var.inspection_vpc_id
   transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_propagation = false
   appliance_mode_support                          = "enable"
   tags = {
     Name = "inspection-vpc-attachment"
@@ -44,6 +45,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "spoke_tgw_attachment" {
   transit_gateway_id                              = var.tgw_id
   vpc_id                                          = var.spoke_vpc_ids[count.index]
   transit_gateway_default_route_table_association = false
+  transit_gateway_default_route_table_propagation = false
   tags = {
     Name = "spoke-each.value-attachment"
   }

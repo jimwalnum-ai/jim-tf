@@ -8,6 +8,8 @@ module "private_hosted_zone" {
   tags = {
     environment = "development"
   }
+
+  depends_on = [module.vpc-dev]
 }
 
 resource "aws_route53_record" "git" {
