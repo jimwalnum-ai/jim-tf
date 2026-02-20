@@ -3,7 +3,7 @@ data "aws_partition" "current" {}
 data "aws_region" "current" {}
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csz"
+  prefix            = "csx7"
   env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }

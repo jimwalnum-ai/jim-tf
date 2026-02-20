@@ -16,6 +16,15 @@ sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-c
 sudo chmod +x /usr/local/bin/docker-compose
 
 sudo yum install -y openldap openldap-clients openldap-servers
+sudo tee /etc/profile.d/ldap.sh >/dev/null <<'EOF'
+export LDAP_HOST='ldap.crimsonscallion.com'
+export LDAP_BASE='dc=crimsonscallion,dc=com'
+export LDAP_PORT='389'
+export LDAP_UID='uid'
+export LDAP_METHOD='plain'
+export LDAP_BIND_DN='cn=admin,dc=crimsonscallion,dc=com'
+export LDAP_PASSWORD='admin'
+EOF
 docker-compose up -d
 
 sleep 10

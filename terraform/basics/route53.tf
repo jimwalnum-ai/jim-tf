@@ -1,3 +1,10 @@
+resource "aws_route53_zone" "crimsonscallion_public" {
+  name    = "crimsonscallion.com"
+  comment = "R53 Terraform"
+
+  tags = local.tags
+}
+
 module "private_hosted_zone" {
   source      = "../modules/route53"
   domain      = "crimsonscallion.com"

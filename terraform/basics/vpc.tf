@@ -37,8 +37,9 @@ module "vpc-dev" {
   env                    = "dev"
   region                 = "us-east-1"
   private_subnets_count  = 3
-  public_subnets_count   = 1
+  public_subnets_count   = 2
   transit_gateway        = module.tgw.id
+  create_tgw_routes      = true
   test                   = true
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
   endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
@@ -61,6 +62,7 @@ module "vpc-prd" {
   region                 = "us-east-1"
   private_subnets_count  = 3
   transit_gateway        = module.tgw.id
+  create_tgw_routes      = true
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
   endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
@@ -207,6 +209,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-inspect" {
   vpc_id                                          = module.vpc-inspect.vpc_id
   transit_gateway_default_route_table_association = false
   transit_gateway_default_route_table_propagation = false
+  appliance_mode_support                          = "enable"
   depends_on                                      = [module.tgw]
   tags                                            = local.tags
 }

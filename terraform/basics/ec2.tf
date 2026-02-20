@@ -47,9 +47,13 @@ resource "aws_instance" "ec2_public_instance_1" {
 }
 
 resource "aws_instance" "ec2_public_instance_2" {
-  ami                         = data.aws_ami.al2023.id
-  subnet_id                   = module.vpc-dev.public_subnets[0]
-  instance_type               = "t3.medium"
+  ami           = data.aws_ami.al2023.id
+  subnet_id     = module.vpc-dev.public_subnets[0]
+  instance_type = "t3.medium"
+  root_block_device {
+    volume_size = 50
+    volume_type = "gp3"
+  }
   iam_instance_profile        = aws_iam_instance_profile.private.name
   vpc_security_group_ids      = [aws_security_group.public_instance.id]
   associate_public_ip_address = true

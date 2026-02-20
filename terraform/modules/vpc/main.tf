@@ -171,28 +171,6 @@ resource "aws_network_acl_rule" "private_outbound_internal" {
   cidr_block     = each.value.cidr
 }
 
-resource "aws_network_acl_rule" "private_outbound_http" {
-  network_acl_id = aws_network_acl.private_acl.id
-  rule_number    = 200
-  egress         = true
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 80
-  to_port        = 80
-}
-
-resource "aws_network_acl_rule" "private_outbound_https" {
-  network_acl_id = aws_network_acl.private_acl.id
-  rule_number    = 210
-  egress         = true
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 443
-  to_port        = 443
-}
-
 # Subnets
 resource "aws_subnet" "tgw_subnets" {
   count             = var.private_subnets_count
@@ -261,6 +239,31 @@ resource "aws_route_table" "nat_gateway" {
     cidr_block     = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat_gateway[count.index].id
   }
+}
+
+resource "aws_route_table" "tgw_subnets" {
+  count  = var.create_tgw_routes ? 1 : 0
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block         = "0.0.0.0/0"
+    transit_gateway_id = var.transit_gateway
+  }
+}
+
+resource "aws_route_table" "protected_subnets" {
+  vpc_id = aws_vpc.vpc.id
+}
+
+resource "aws_route_table_association" "tgw_subnets" {
+  count          = var.create_tgw_routes ? var.private_subnets_count : 0
+  subnet_id      = aws_subnet.tgw_subnets[count.index].id
+  route_table_id = aws_route_table.tgw_subnets[0].id
+}
+
+resource "aws_route_table_association" "protected_subnets" {
+  count          = var.private_subnets_count
+  subnet_id      = aws_subnet.protected_subnets[count.index].id
+  route_table_id = aws_route_table.protected_subnets.id
 }
 
 #resource "aws_route_table_association" "nat_gateway" {

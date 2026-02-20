@@ -109,9 +109,9 @@ def _resolve_queue_url(queue_name_or_url):
 
 queue_url = _resolve_queue_url(QUEUE_NAME)
 
-MESSAGES_PER_MINUTE = 100
-MESSAGES_MIN = 80
-MESSAGES_MAX = 120
+MESSAGES_PER_MINUTE = 1000
+MESSAGES_MIN = 1000
+MESSAGES_MAX = 1200
 INTERVAL_SECONDS = 60
 BATCH_SIZE = 10
 MAX_WORKERS = 8
@@ -129,11 +129,11 @@ def _build_entries(start_index: int, count: int):
                 'MessageAttributes': {
                     'Factor': {
                         'DataType': 'Number',
-                        'StringValue': str(random.randint(4, 16000)),
+                        'StringValue': str(random.randint(4, 400000)),
                     },
                     'Scheme': {
                         'DataType': 'Number',
-                        'StringValue': '16000',
+                        'StringValue': '400000',
                     },
                 },
             }

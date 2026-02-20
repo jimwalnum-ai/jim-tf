@@ -40,6 +40,12 @@ variable "ecs_test_msg_schedule" {
   default     = "rate(30 minutes)"
 }
 
+variable "web_db_name" {
+  type        = string
+  description = "Database name for the web service."
+  default     = "factors"
+}
+
 data "aws_subnets" "public_selected" {
   filter {
     name   = "tag:scope"
@@ -58,6 +64,8 @@ locals {
   process_script_b64      = base64encode(file("${path.module}/../code/process.py"))
   persist_script_b64      = base64encode(file("${path.module}/../code/persist.py"))
   test_msg_script_b64     = base64encode(file("${path.module}/../code/test_msg.py"))
+  web_server_script_b64   = base64encode(file("${path.module}/../web/server.py"))
+  web_index_b64           = base64encode(file("${path.module}/../web/index.html"))
   process_command = trimspace(<<-EOT
     set -e
     python - <<'PY'
@@ -89,6 +97,18 @@ locals {
     PY
     ${local.ecs_pip_install_command}
     python /app/test_msg.py
+  EOT
+  )
+  web_command = trimspace(<<-EOT
+    set -e
+    python - <<'PY'
+    import base64, os, pathlib
+    pathlib.Path("/app").mkdir(parents=True, exist_ok=True)
+    pathlib.Path("/app/server.py").write_bytes(base64.b64decode(os.environ["SERVER_B64"]))
+    pathlib.Path("/app/index.html").write_bytes(base64.b64decode(os.environ["INDEX_B64"]))
+    PY
+    ${local.ecs_pip_install_command}
+    python /app/server.py
   EOT
   )
 }
@@ -126,6 +146,11 @@ resource "aws_cloudwatch_log_group" "persist" {
 
 resource "aws_cloudwatch_log_group" "test_msg" {
   name = "/ecs/${local.ecs_cluster_name}/test-msg"
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_log_group" "web" {
+  name = "/ecs/${local.ecs_cluster_name}/web"
   tags = local.tags
 }
 
@@ -234,6 +259,78 @@ resource "aws_ecs_task_definition" "test_msg" {
   ])
 }
 
+resource "aws_ecs_task_definition" "web" {
+  family                   = "${local.ecs_cluster_name}-web"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.ecs_task_cpu
+  memory                   = var.ecs_task_memory
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name       = "web"
+      image      = var.ecs_image
+      essential  = true
+      entryPoint = ["/bin/sh", "-c"]
+      command    = [local.web_command]
+      portMappings = [
+        {
+          containerPort = 8000
+          hostPort      = 8000
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        {
+          name  = "SERVER_B64"
+          value = local.web_server_script_b64
+        },
+        {
+          name  = "INDEX_B64"
+          value = local.web_index_b64
+        },
+        {
+          name  = "PORT"
+          value = "8000"
+        },
+        {
+          name  = "FACTOR_DB_NAME"
+          value = var.web_db_name
+        }
+      ]
+      secrets = [
+        {
+          name      = "FACTOR_DB_USER"
+          valueFrom = "${aws_secretsmanager_secret.cs_rds_credentials.arn}:username::"
+        },
+        {
+          name      = "FACTOR_DB_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.cs_rds_credentials.arn}:password::"
+        },
+        {
+          name      = "FACTOR_DB_HOST"
+          valueFrom = "${aws_secretsmanager_secret.cs_rds_credentials.arn}:host::"
+        },
+        {
+          name      = "FACTOR_DB_PORT"
+          valueFrom = "${aws_secretsmanager_secret.cs_rds_credentials.arn}:port::"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.web.name
+          awslogs-region        = data.aws_region.current.id
+          awslogs-create-group  = "true"
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
 resource "aws_ecs_service" "process" {
   name            = "${local.ecs_cluster_name}-process"
   cluster         = aws_ecs_cluster.factor.id
@@ -273,6 +370,26 @@ resource "aws_ecs_service" "test_msg" {
     subnets          = data.aws_subnets.public_selected.ids
     security_groups  = [aws_security_group.ecs_tasks.id]
     assign_public_ip = var.ecs_assign_public_ip
+  }
+}
+
+resource "aws_ecs_service" "web" {
+  name            = "${local.ecs_cluster_name}-web"
+  cluster         = aws_ecs_cluster.factor.id
+  task_definition = aws_ecs_task_definition.web.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = data.aws_subnets.public_selected.ids
+    security_groups  = [aws_security_group.web_tasks.id]
+    assign_public_ip = var.ecs_assign_public_ip
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.web.arn
+    container_name   = "web"
+    container_port   = 8000
   }
 }
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scheme Metrics</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; }
+      form { display: flex; gap: 0.5rem; align-items: center; }
+      input { padding: 0.4rem 0.6rem; }
+      button { padding: 0.4rem 0.8rem; }
+      .card { margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; max-width: 420px; }
+      .label { color: #555; }
+      .value { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Scheme Metrics</h1>
+    <form id="scheme-form">
+      <label for="scheme">Scheme</label>
+      <input id="scheme" name="scheme" placeholder="e.g. 1" />
+      <button type="submit">Load</button>
+    </form>
+
+    <div class="card" id="result">
+      <div><span class="label">Count:</span> <span class="value" id="count">-</span></div>
+      <div><span class="label">Average (ms):</span> <span class="value" id="avg">-</span></div>
+      <div><span class="label">Std dev (ms):</span> <span class="value" id="stddev">-</span></div>
+    </div>
+
+    <script>
+      const form = document.getElementById("scheme-form");
+      const countEl = document.getElementById("count");
+      const avgEl = document.getElementById("avg");
+      const stddevEl = document.getElementById("stddev");
+
+      function render(payload) {
+        countEl.textContent = payload.count ?? "-";
+        avgEl.textContent = payload.average_ms == null ? "-" : payload.average_ms.toFixed(2);
+        stddevEl.textContent = payload.stddev_ms == null ? "-" : payload.stddev_ms.toFixed(2);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const scheme = document.getElementById("scheme").value.trim();
+        const query = scheme ? `?scheme=${encodeURIComponent(scheme)}` : "";
+        const response = await fetch(`/api/scheme${query}`);
+        const payload = await response.json();
+        render(payload);
+      });
+    </script>
+  </body>
+</html>

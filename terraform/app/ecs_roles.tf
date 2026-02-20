@@ -38,6 +38,24 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
+  name = "${local.ecs_cluster_name}-task-execution-secrets"
+  role = aws_iam_role.ecs_task_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ],
+        Resource = [aws_secretsmanager_secret.cs_rds_credentials.arn]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "ecs_task_execution_logs" {
   name   = "${local.ecs_cluster_name}-task-execution-logs"
   role   = aws_iam_role.ecs_task_execution.id

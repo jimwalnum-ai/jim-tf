@@ -98,6 +98,12 @@ variable "transit_gateway" {
   default     = ""
 }
 
+variable "create_tgw_routes" {
+  type        = bool
+  description = "Create TGW route tables and associations"
+  default     = false
+}
+
 variable "ipv4_ipam_pool_id" {
   type        = string
   description = "IPAM Pool Id"
