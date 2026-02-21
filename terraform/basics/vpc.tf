@@ -8,7 +8,7 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  available_azs = sort(data.aws_availability_zones.available.names)
+  available_azs = slice(sort(data.aws_availability_zones.available.names),1,length(data.aws_availability_zones.available.names))
 }
 
 module "core-kms-key" {
