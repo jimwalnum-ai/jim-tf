@@ -82,7 +82,7 @@ resource "aws_iam_instance_profile" "private" {
 
 resource "aws_instance" "ec2_private_instance" {
   ami                    = data.aws_ami.al2023.id
-  subnet_id              = module.vpc-dev.protected_subnets[0]
+  subnet_id              = module.vpc-dev.tgw_subnets[0]
   instance_type          = "t3.micro"
   iam_instance_profile   = aws_iam_instance_profile.private.name
   vpc_security_group_ids = [aws_security_group.private_instance.id]

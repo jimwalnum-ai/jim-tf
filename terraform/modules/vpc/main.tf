@@ -11,7 +11,7 @@ locals {
   requested_azs_count  = max(var.private_subnets_count, var.public_subnets_count)
   default_azs          = sort(data.aws_availability_zones.available.names)
   azs_source           = length(var.availability_zones) > 0 ? var.availability_zones : local.default_azs
-  azs                  = slice(local.azs_source, 1, local.requested_azs_count+1)
+  azs                  = slice(local.azs_source, 0, local.requested_azs_count)
   endpoint_subnet_ids  = length(var.endpoint_subnet_ids) > 0 ? var.endpoint_subnet_ids : aws_subnet.tgw_subnets[*].id
   internal_ingress_cidrs_map = merge(
     { "vpc" = { cidr = aws_vpc.vpc.cidr_block, rule_offset = 0 } },
@@ -22,7 +22,7 @@ locals {
 }
 
 output "az" {
- value = data.aws_availability_zones.available.names
+  value = data.aws_availability_zones.available.names
 }
 
 resource "aws_vpc" "vpc" {

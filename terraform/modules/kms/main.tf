@@ -19,9 +19,11 @@ resource "aws_kms_alias" "kms_key_alias" {
 data "template_file" "kms_key_policy" {
   template = file("${path.module}/templates/kms_key_policy.json.tpl")
   vars = {
-    write_resources   = "${jsonencode(local.access_roles)}"
-    allowed_resources = "${jsonencode(concat(var.readonly_roles, local.access_roles))}"
-    region            = data.aws_region.current.id
+    write_resources                      = "${jsonencode(local.access_roles)}"
+    allowed_resources                    = "${jsonencode(concat(var.readonly_roles, local.access_roles))}"
+    region                               = data.aws_region.current.id
+    autoscaling_service_role_arn_pattern = jsonencode(var.autoscaling_service_role_arn_pattern)
+    eks_node_role_arn_pattern            = jsonencode(var.eks_node_role_arn_pattern)
   }
 }
 

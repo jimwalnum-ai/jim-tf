@@ -38,7 +38,6 @@ sec_data = json.loads(response["SecretString"])
 
 db_name = os.getenv("FACTOR_DB_NAME", sec_data.get("database", "factors"))
 
-
 def _build_conn_params(secret_data):
     host = secret_data["host"]
     port = secret_data.get("port")

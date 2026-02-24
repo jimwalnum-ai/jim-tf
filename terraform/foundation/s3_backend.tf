@@ -3,7 +3,9 @@ module "backend-kms-key" {
   key_name = "${local.prefix}-use1-backend-s3-kms"
   readonly_roles = ["arn:aws:iam::${local.acct_id}:root",
   "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"]
-  write_roles = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]
+  write_roles                          = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]
+  autoscaling_service_role_arn_pattern = "arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"
+  eks_node_role_arn_pattern            = ["arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"]
 }
 
 module "s3" {

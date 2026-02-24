@@ -1,6 +1,7 @@
 module "tgw" {
-  source = "../modules/transit-gateway"
-  env    = "dev"
+  source          = "../modules/transit-gateway"
+  env             = "dev"
+  flow_log_bucket = module.s3-flow-log-bucket.bucket_arn
 }
 
 data "aws_availability_zones" "available" {
@@ -8,15 +9,17 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  available_azs = slice(sort(data.aws_availability_zones.available.names),1,length(data.aws_availability_zones.available.names))
+  available_azs = sort(data.aws_availability_zones.available.names)
 }
 
 module "core-kms-key" {
-  source         = "../modules/kms"
-  key_name       = "cs-core-kms"
-  readonly_roles = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]
-  write_roles    = ["arn:aws:iam::${local.acct_id}:role/cs-terraform-role", "arn:aws:iam::${local.acct_id}:root"]
-  tags           = local.tags
+  source                               = "../modules/kms"
+  key_name                             = "cs-core-kms"
+  readonly_roles                       = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]
+  write_roles                          = ["arn:aws:iam::${local.acct_id}:role/cs-terraform-role", "arn:aws:iam::${local.acct_id}:root"]
+  autoscaling_service_role_arn_pattern = "arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"
+  eks_node_role_arn_pattern            = ["arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"]
+  tags                                 = local.tags
 }
 
 module "s3-flow-log-bucket" {
@@ -38,6 +41,7 @@ module "vpc-dev" {
   region                 = "us-east-1"
   private_subnets_count  = 3
   public_subnets_count   = 2
+  availability_zones     = slice(local.available_azs, 0, max(3, 2))
   transit_gateway        = module.tgw.id
   create_tgw_routes      = true
   test                   = true
@@ -61,6 +65,7 @@ module "vpc-prd" {
   env                    = "prd"
   region                 = "us-east-1"
   private_subnets_count  = 3
+  availability_zones     = slice(local.available_azs, 0, max(3, 0))
   transit_gateway        = module.tgw.id
   create_tgw_routes      = true
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn

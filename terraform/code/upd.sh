@@ -26,6 +26,7 @@ export LDAP_METHOD='plain'
 export LDAP_BIND_DN='cn=admin,dc=crimsonscallion,dc=com'
 export LDAP_PASSWORD='admin'
 EOF
+sudo su docker 
 docker-compose up -d
 
 sleep 10
