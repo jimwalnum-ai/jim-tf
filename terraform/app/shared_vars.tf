@@ -1,9 +1,16 @@
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}
+variable "enable_ecs" {
+  description = "Set to false to disable all ECS factor resources."
+  type        = bool
+  default     = false
+}
+
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
   prefix            = "csx7"
+  enable_ecs        = var.enable_ecs
   env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }

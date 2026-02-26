@@ -47,6 +47,8 @@ variable "web_db_name" {
 }
 
 data "aws_subnets" "public_selected" {
+  count = local.enable_ecs ? 1 : 0
+
   filter {
     name   = "tag:scope"
     values = ["public"]
@@ -60,10 +62,11 @@ data "aws_subnets" "public_selected" {
 
 locals {
   ecs_cluster_name        = var.ecs_cluster_name != null && var.ecs_cluster_name != "" ? var.ecs_cluster_name : "ecs-factor-${var.env}"
-  ecs_pip_install_command = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
+  ecs_pip_install_command  = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
   process_script_b64      = base64encode(file("${path.module}/../code/process.py"))
   persist_script_b64      = base64encode(file("${path.module}/../code/persist.py"))
   test_msg_script_b64     = base64encode(file("${path.module}/../code/test_msg.py"))
+  ecs_public_subnet_ids   = local.enable_ecs ? data.aws_subnets.public_selected[0].ids : []
   process_command = trimspace(<<-EOT
     set -e
     python - <<'PY'
@@ -100,11 +103,13 @@ locals {
 }
 
 resource "aws_ecs_cluster" "factor" {
-  name = local.ecs_cluster_name
-  tags = local.tags
+  count = local.enable_ecs ? 1 : 0
+  name  = local.ecs_cluster_name
+  tags  = local.tags
 }
 
 resource "aws_security_group" "ecs_tasks" {
+  count       = local.enable_ecs ? 1 : 0
   name        = "${local.ecs_cluster_name}-tasks"
   description = "ECS tasks for factor workloads"
   vpc_id      = data.aws_vpc.dev-vpc.id
@@ -121,29 +126,33 @@ resource "aws_security_group" "ecs_tasks" {
 
 
 resource "aws_cloudwatch_log_group" "process" {
-  name = "/ecs/${local.ecs_cluster_name}/process"
-  tags = local.tags
+  count = local.enable_ecs ? 1 : 0
+  name  = "/ecs/${local.ecs_cluster_name}/process"
+  tags  = local.tags
 }
 
 resource "aws_cloudwatch_log_group" "persist" {
-  name = "/ecs/${local.ecs_cluster_name}/persist"
-  tags = local.tags
+  count = local.enable_ecs ? 1 : 0
+  name  = "/ecs/${local.ecs_cluster_name}/persist"
+  tags  = local.tags
 }
 
 resource "aws_cloudwatch_log_group" "test_msg" {
-  name = "/ecs/${local.ecs_cluster_name}/test-msg"
-  tags = local.tags
+  count = local.enable_ecs ? 1 : 0
+  name  = "/ecs/${local.ecs_cluster_name}/test-msg"
+  tags  = local.tags
 }
 
 
 resource "aws_ecs_task_definition" "process" {
+  count                    = local.enable_ecs ? 1 : 0
   family                   = "${local.ecs_cluster_name}-process"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
   memory                   = var.ecs_task_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  execution_role_arn       = aws_iam_role.ecs_task_execution[0].arn
+  task_role_arn            = aws_iam_role.ecs_task[0].arn
 
   container_definitions = jsonencode([
     {
@@ -161,7 +170,7 @@ resource "aws_ecs_task_definition" "process" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = aws_cloudwatch_log_group.process.name
+          awslogs-group         = aws_cloudwatch_log_group.process[0].name
           awslogs-region        = data.aws_region.current.id
           awslogs-create-group  = "true"
           awslogs-stream-prefix = "ecs"
@@ -172,13 +181,14 @@ resource "aws_ecs_task_definition" "process" {
 }
 
 resource "aws_ecs_task_definition" "persist" {
+  count                    = local.enable_ecs ? 1 : 0
   family                   = "${local.ecs_cluster_name}-persist"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
   memory                   = var.ecs_task_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  execution_role_arn       = aws_iam_role.ecs_task_execution[0].arn
+  task_role_arn            = aws_iam_role.ecs_task[0].arn
 
   container_definitions = jsonencode([
     {
@@ -196,7 +206,7 @@ resource "aws_ecs_task_definition" "persist" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = aws_cloudwatch_log_group.persist.name
+          awslogs-group         = aws_cloudwatch_log_group.persist[0].name
           awslogs-region        = data.aws_region.current.id
           awslogs-create-group  = "true"
           awslogs-stream-prefix = "ecs"
@@ -207,13 +217,14 @@ resource "aws_ecs_task_definition" "persist" {
 }
 
 resource "aws_ecs_task_definition" "test_msg" {
+  count                    = local.enable_ecs ? 1 : 0
   family                   = "${local.ecs_cluster_name}-test-msg"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.ecs_task_cpu
   memory                   = var.ecs_task_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  execution_role_arn       = aws_iam_role.ecs_task_execution[0].arn
+  task_role_arn            = aws_iam_role.ecs_task[0].arn
 
   container_definitions = jsonencode([
     {
@@ -231,7 +242,7 @@ resource "aws_ecs_task_definition" "test_msg" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = aws_cloudwatch_log_group.test_msg.name
+          awslogs-group         = aws_cloudwatch_log_group.test_msg[0].name
           awslogs-region        = data.aws_region.current.id
           awslogs-create-group  = "true"
           awslogs-stream-prefix = "ecs"
@@ -242,67 +253,72 @@ resource "aws_ecs_task_definition" "test_msg" {
 }
 
 resource "aws_ecs_service" "process" {
+  count           = local.enable_ecs ? 1 : 0
   name            = "${local.ecs_cluster_name}-process"
-  cluster         = aws_ecs_cluster.factor.id
-  task_definition = aws_ecs_task_definition.process.arn
+  cluster         = aws_ecs_cluster.factor[0].id
+  task_definition = aws_ecs_task_definition.process[0].arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.public_selected.ids
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    subnets          = local.ecs_public_subnet_ids
+    security_groups  = [aws_security_group.ecs_tasks[0].id]
     assign_public_ip = var.ecs_assign_public_ip
   }
 }
 
 resource "aws_ecs_service" "persist" {
+  count           = local.enable_ecs ? 1 : 0
   name            = "${local.ecs_cluster_name}-persist"
-  cluster         = aws_ecs_cluster.factor.id
-  task_definition = aws_ecs_task_definition.persist.arn
+  cluster         = aws_ecs_cluster.factor[0].id
+  task_definition = aws_ecs_task_definition.persist[0].arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.public_selected.ids
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    subnets          = local.ecs_public_subnet_ids
+    security_groups  = [aws_security_group.ecs_tasks[0].id]
     assign_public_ip = var.ecs_assign_public_ip
   }
 }
 
 resource "aws_ecs_service" "test_msg" {
+  count           = local.enable_ecs ? 1 : 0
   name            = "${local.ecs_cluster_name}-test-msg"
-  cluster         = aws_ecs_cluster.factor.id
-  task_definition = aws_ecs_task_definition.test_msg.arn
+  cluster         = aws_ecs_cluster.factor[0].id
+  task_definition = aws_ecs_task_definition.test_msg[0].arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.public_selected.ids
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    subnets          = local.ecs_public_subnet_ids
+    security_groups  = [aws_security_group.ecs_tasks[0].id]
     assign_public_ip = var.ecs_assign_public_ip
   }
 }
 
 
 resource "aws_cloudwatch_event_rule" "test_msg" {
+  count               = local.enable_ecs ? 1 : 0
   name                = "${local.ecs_cluster_name}-test-msg"
   schedule_expression = var.ecs_test_msg_schedule
   tags                = local.tags
 }
 
 resource "aws_cloudwatch_event_target" "test_msg" {
-  rule      = aws_cloudwatch_event_rule.test_msg.name
+  count     = local.enable_ecs ? 1 : 0
+  rule      = aws_cloudwatch_event_rule.test_msg[0].name
   target_id = "${local.ecs_cluster_name}-test-msg"
-  arn       = aws_ecs_cluster.factor.arn
-  role_arn  = aws_iam_role.ecs_events.arn
+  arn       = aws_ecs_cluster.factor[0].arn
+  role_arn  = aws_iam_role.ecs_events[0].arn
 
   ecs_target {
-    task_definition_arn = aws_ecs_task_definition.test_msg.arn
+    task_definition_arn = aws_ecs_task_definition.test_msg[0].arn
     task_count          = 1
     launch_type         = "FARGATE"
     network_configuration {
-      subnets          = data.aws_subnets.public_selected.ids
-      security_groups  = [aws_security_group.ecs_tasks.id]
+      subnets          = local.ecs_public_subnet_ids
+      security_groups  = [aws_security_group.ecs_tasks[0].id]
       assign_public_ip = var.ecs_assign_public_ip
     }
   }
