@@ -6,7 +6,8 @@ module "ebs-kms-key" {
   autoscaling_service_role_arn_pattern = "arn:aws:iam::${local.acct_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
   eks_node_role_arn_pattern = [
     "arn:aws:iam::${local.acct_id}:role/general_purpose-eks-node-group-*",
-    "arn:aws:iam::${local.acct_id}:role/eks-node-group-role"
+    "arn:aws:iam::${local.acct_id}:role/eks-node-group-role",
+    "arn:aws:iam::${local.acct_id}:role/eks-cluster-*"
   ]
   tags = local.tags
 }
@@ -19,13 +20,14 @@ module "ebs-kms-key-v2" {
   autoscaling_service_role_arn_pattern = "arn:aws:iam::${local.acct_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
   eks_node_role_arn_pattern = [
     "arn:aws:iam::${local.acct_id}:role/general_purpose-eks-node-group-*",
-    "arn:aws:iam::${local.acct_id}:role/eks-node-group-role"
+    "arn:aws:iam::${local.acct_id}:role/eks-node-group-role",
+    "arn:aws:iam::${local.acct_id}:role/eks-cluster-*"
   ]
   tags = local.tags
 }
 
 resource "aws_ebs_encryption_by_default" "default" {
-  enabled = true
+  enabled = false
 }
 
 resource "aws_ebs_default_kms_key" "default" {
