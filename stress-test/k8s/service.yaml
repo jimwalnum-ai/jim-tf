@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stress-test
+  labels:
+    app: stress-test
+spec:
+  type: ClusterIP
+  selector:
+    app: stress-test
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP

@@ -5,49 +5,126 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Scheme Metrics</title>
     <style>
-      body { font-family: system-ui, sans-serif; margin: 2rem; }
-      form { display: flex; gap: 0.5rem; align-items: center; }
-      input { padding: 0.4rem 0.6rem; }
-      button { padding: 0.4rem 0.8rem; }
-      .card { margin-top: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; max-width: 420px; }
-      .label { color: #555; }
-      .value { font-weight: 600; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: system-ui, sans-serif; padding: 2rem; background: #f5f7fa; color: #1a1a2e; }
+      h1 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+      form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+      select, button { padding: 0.5rem 0.8rem; font-size: 0.95rem; border: 1px solid #ccc; border-radius: 6px; }
+      select { min-width: 180px; background: #fff; }
+      button { background: #2563eb; color: #fff; border: none; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      button:disabled { background: #94a3b8; cursor: not-allowed; }
+      .status { color: #64748b; font-size: 0.9rem; margin-top: 0.75rem; }
+      .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
+      .card {
+        flex: 1; min-width: 260px; max-width: 360px; padding: 1.25rem;
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .card h2 { font-size: 1rem; color: #334155; margin-bottom: 0.75rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+      .row { display: flex; justify-content: space-between; padding: 0.35rem 0; }
+      .row + .row { border-top: 1px solid #f1f5f9; }
+      .label { color: #64748b; font-size: 0.9rem; }
+      .value { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
     </style>
   </head>
   <body>
     <h1>Scheme Metrics</h1>
     <form id="scheme-form">
       <label for="scheme">Scheme</label>
-      <input id="scheme" name="scheme" placeholder="e.g. 1" />
-      <button type="submit">Load</button>
+      <select id="scheme">
+        <option value="">-- select a scheme --</option>
+      </select>
+      <button type="submit" id="load-btn">Load</button>
     </form>
+    <div class="status" id="status">Loading schemes...</div>
 
-    <div class="card" id="result">
-      <div><span class="label">Count:</span> <span class="value" id="count">-</span></div>
-      <div><span class="label">Average (ms):</span> <span class="value" id="avg">-</span></div>
-      <div><span class="label">Std dev (ms):</span> <span class="value" id="stddev">-</span></div>
+    <div class="cards" id="results" style="display:none;">
+      <div class="card" id="card-sent">
+        <h2>Send to Persist</h2>
+        <div class="row"><span class="label">Count</span><span class="value" id="sent-count">-</span></div>
+        <div class="row"><span class="label">Avg (ms)</span><span class="value" id="sent-avg">-</span></div>
+        <div class="row"><span class="label">Std Dev (ms)</span><span class="value" id="sent-stddev">-</span></div>
+        <div class="row"><span class="label">Min (ms)</span><span class="value" id="sent-min">-</span></div>
+        <div class="row"><span class="label">Max (ms)</span><span class="value" id="sent-max">-</span></div>
+      </div>
+      <div class="card" id="card-pull">
+        <h2>Pull to Persist</h2>
+        <div class="row"><span class="label">Count</span><span class="value" id="pull-count">-</span></div>
+        <div class="row"><span class="label">Avg (ms)</span><span class="value" id="pull-avg">-</span></div>
+        <div class="row"><span class="label">Std Dev (ms)</span><span class="value" id="pull-stddev">-</span></div>
+        <div class="row"><span class="label">Min (ms)</span><span class="value" id="pull-min">-</span></div>
+        <div class="row"><span class="label">Max (ms)</span><span class="value" id="pull-max">-</span></div>
+      </div>
+      <div class="card" id="card-queue">
+        <h2>Queue to DB</h2>
+        <div class="row"><span class="label">Count</span><span class="value" id="queue-count">-</span></div>
+        <div class="row"><span class="label">Avg (ms)</span><span class="value" id="queue-avg">-</span></div>
+        <div class="row"><span class="label">Std Dev (ms)</span><span class="value" id="queue-stddev">-</span></div>
+        <div class="row"><span class="label">Min (ms)</span><span class="value" id="queue-min">-</span></div>
+        <div class="row"><span class="label">Max (ms)</span><span class="value" id="queue-max">-</span></div>
+      </div>
     </div>
 
     <script>
       const form = document.getElementById("scheme-form");
-      const countEl = document.getElementById("count");
-      const avgEl = document.getElementById("avg");
-      const stddevEl = document.getElementById("stddev");
+      const select = document.getElementById("scheme");
+      const loadBtn = document.getElementById("load-btn");
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
 
-      function render(payload) {
-        countEl.textContent = payload.count ?? "-";
-        avgEl.textContent = payload.average_ms == null ? "-" : payload.average_ms.toFixed(2);
-        stddevEl.textContent = payload.stddev_ms == null ? "-" : payload.stddev_ms.toFixed(2);
+      function fmt(v) {
+        return v != null ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-";
+      }
+
+      function renderCard(prefix, stats) {
+        document.getElementById(`${prefix}-count`).textContent = stats.count != null ? stats.count.toLocaleString() : "-";
+        document.getElementById(`${prefix}-avg`).textContent = fmt(stats.avg);
+        document.getElementById(`${prefix}-stddev`).textContent = fmt(stats.stddev);
+        document.getElementById(`${prefix}-min`).textContent = fmt(stats.min);
+        document.getElementById(`${prefix}-max`).textContent = fmt(stats.max);
+      }
+
+      async function loadSchemes() {
+        try {
+          const res = await fetch("/api/schemes");
+          const data = await res.json();
+          select.innerHTML = '<option value="">-- all schemes --</option>';
+          data.schemes.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = s;
+            select.appendChild(opt);
+          });
+          statusEl.textContent = `${data.schemes.length} scheme(s) available`;
+        } catch {
+          statusEl.textContent = "Failed to load schemes.";
+        }
       }
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const scheme = document.getElementById("scheme").value.trim();
+        loadBtn.disabled = true;
+        loadBtn.textContent = "Loading...";
+        const scheme = select.value;
         const query = scheme ? `?scheme=${encodeURIComponent(scheme)}` : "";
-        const response = await fetch(`/api/scheme${query}`);
-        const payload = await response.json();
-        render(payload);
+        try {
+          const res = await fetch(`/api/scheme${query}`);
+          const payload = await res.json();
+          resultsEl.style.display = "";
+          renderCard("sent", payload.sent_to_persist);
+          renderCard("pull", payload.pull_to_persist);
+          renderCard("queue", payload.queue_to_db);
+          statusEl.textContent = `Showing metrics for scheme: ${payload.scheme || "All"}`;
+        } catch {
+          statusEl.textContent = "Request failed.";
+        } finally {
+          loadBtn.disabled = false;
+          loadBtn.textContent = "Load";
+        }
       });
+
+      loadSchemes();
     </script>
   </body>
 </html>

@@ -242,21 +242,5 @@ resource "aws_nat_gateway" "inspection_vpc_nat_gw" {
   }
 }
 
-resource "aws_route_table" "inspection_vpc_firewall_subnet_route_table" {
-  count  = 2
-  vpc_id = aws_vpc.vpc.id
-  route {
-    cidr_block         = var.super_cidr_block
-    transit_gateway_id = var.transit_gateway
-  }
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.inspection_vpc_nat_gw[count.index].id
-  }
-  tags = {
-    Name = "inspection-vpc/${local.available_azs[count.index]}/firewall-subnet-route-table"
-  }
-}
-
 
 

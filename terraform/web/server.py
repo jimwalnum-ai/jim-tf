@@ -23,70 +23,90 @@ def _db_conn():
     return psycopg2.connect(**params)
 
 
-def _collect_ms(rows):
-    ms_values = []
-    for factors in rows:
-        if factors is None:
+def _collect_metrics(rows):
+    """Extract timing metrics from each row's data dict."""
+    sent_to_persist = []
+    pull_to_persist = []
+    queue_to_db = []
+    for record in rows:
+        if record is None:
             continue
-        if isinstance(factors, str):
+        if isinstance(record, str):
             try:
-                factors = json.loads(factors)
+                record = json.loads(record)
             except json.JSONDecodeError:
                 continue
-        if isinstance(factors, dict):
-            factors = [factors]
-        if not isinstance(factors, list):
+        if not isinstance(record, dict):
             continue
-        for item in factors:
-            if not isinstance(item, dict):
-                continue
-            ms_value = item.get("ms")
-            if ms_value is None:
-                continue
-            try:
-                ms_values.append(float(ms_value))
-            except (TypeError, ValueError):
-                continue
-    return ms_values
+        for key, dest in [
+            ("sent_to_persist_ms", sent_to_persist),
+            ("pull_to_persist_ms", pull_to_persist),
+            ("queue_to_db_ms", queue_to_db),
+        ]:
+            val = record.get(key)
+            if val is not None:
+                try:
+                    dest.append(float(val))
+                except (TypeError, ValueError):
+                    continue
+    return sent_to_persist, pull_to_persist, queue_to_db
 
 
-def _stats(ms_values):
-    if not ms_values:
-        return {"count": 0, "average_ms": None, "stddev_ms": None}
-    count = len(ms_values)
-    avg = sum(ms_values) / count
-    variance = sum((value - avg) ** 2 for value in ms_values) / count
+def _stats(values):
+    if not values:
+        return {"count": 0, "avg": None, "stddev": None, "min": None, "max": None}
+    count = len(values)
+    avg = sum(values) / count
+    variance = sum((v - avg) ** 2 for v in values) / count
     return {
         "count": count,
-        "average_ms": avg,
-        "stddev_ms": variance ** 0.5,
+        "avg": round(avg, 2),
+        "stddev": round(variance ** 0.5, 2),
+        "min": round(min(values), 2),
+        "max": round(max(values), 2),
     }
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def _json_response(self, payload, status=HTTPStatus.OK):
+        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         parsed = urlparse(self.path)
+
+        if parsed.path == "/api/schemes":
+            with _db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT DISTINCT data->>'scheme' AS scheme FROM factors "
+                        "WHERE data->>'scheme' IS NOT NULL ORDER BY scheme"
+                    )
+                    schemes = [row[0] for row in cur.fetchall()]
+            self._json_response({"schemes": schemes})
+            return
+
         if parsed.path == "/api/scheme":
             query = parse_qs(parsed.query)
             scheme_value = query.get("scheme", [None])[0]
             with _db_conn() as conn:
                 with conn.cursor() as cur:
                     if scheme_value is None or scheme_value == "":
-                        cur.execute("SELECT factors FROM scheme")
+                        cur.execute("SELECT data FROM factors")
                     else:
-                        cur.execute("SELECT factors FROM scheme WHERE scheme = %s", (scheme_value,))
+                        cur.execute("SELECT data FROM factors WHERE (data->>'scheme')::text = %s", (scheme_value,))
                     rows = [row[0] for row in cur.fetchall()]
-            ms_values = _collect_ms(rows)
-            payload = {
+            sent, pull, queue = _collect_metrics(rows)
+            self._json_response({
                 "scheme": scheme_value,
-                **_stats(ms_values),
-            }
-            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+                "sent_to_persist": _stats(sent),
+                "pull_to_persist": _stats(pull),
+                "queue_to_db": _stats(queue),
+            })
             return
 
         super().do_GET()

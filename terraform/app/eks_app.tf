@@ -4,6 +4,16 @@ resource "kubernetes_namespace_v1" "app_namespace" {
   }
 }
 
+resource "kubernetes_secret_v1" "flask_app_db" {
+  metadata {
+    name      = "flask-app-db-credentials"
+    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+  }
+  data = {
+    password = random_password.master_password.result
+  }
+}
+
 resource "kubernetes_deployment_v1" "flask_app_deployment" {
   metadata {
     name      = "flask-app-deployment"
@@ -29,6 +39,31 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
           port {
             container_port = 8000
           }
+          env {
+            name  = "FACTOR_DB_HOST"
+            value = aws_db_instance.factor.address
+          }
+          env {
+            name  = "FACTOR_DB_PORT"
+            value = tostring(aws_db_instance.factor.port)
+          }
+          env {
+            name  = "FACTOR_DB_NAME"
+            value = var.web_db_name
+          }
+          env {
+            name  = "FACTOR_DB_USER"
+            value = aws_db_instance.factor.username
+          }
+          env {
+            name = "FACTOR_DB_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret_v1.flask_app_db.metadata[0].name
+                key  = "password"
+              }
+            }
+          }
         }
       }
     }
@@ -40,7 +75,8 @@ resource "kubernetes_service_v1" "flask_app_service" {
     name      = "flask-app-service"
     namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
     annotations = {
-      "service.beta.kubernetes.io/aws-load-balancer-type" = "nlb"
+      "service.beta.kubernetes.io/aws-load-balancer-type"   = "nlb"
+      "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
     }
   }
   spec {

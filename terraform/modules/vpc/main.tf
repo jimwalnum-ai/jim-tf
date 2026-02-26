@@ -101,6 +101,17 @@ resource "aws_network_acl_rule" "public_inbound_postgres" {
   to_port        = 5432
 }
 
+resource "aws_network_acl_rule" "public_inbound_http" {
+  network_acl_id = aws_network_acl.public_acl.id
+  rule_number    = 450
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 80
+  to_port        = 80
+}
+
 resource "aws_network_acl_rule" "public_inbound_ephemeral" {
   network_acl_id = aws_network_acl.public_acl.id
   rule_number    = 500
@@ -193,11 +204,12 @@ resource "aws_subnet" "protected_subnets" {
 }
 
 resource "aws_subnet" "public_subnets" {
-  count             = var.public_subnets_count
-  vpc_id            = aws_vpc.vpc.id
-  cidr_block        = cidrsubnet(aws_vpc.vpc.cidr_block, 3, 2 * var.private_subnets_count + count.index)
-  availability_zone = local.azs[count.index]
-  tags              = merge(var.tags, { Name = "${local.env_name}-public-subnet-${local.azs[count.index]}", scope = "public" })
+  count                   = var.public_subnets_count
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = cidrsubnet(aws_vpc.vpc.cidr_block, 3, 2 * var.private_subnets_count + count.index)
+  availability_zone       = local.azs[count.index]
+  map_public_ip_on_launch = true
+  tags                    = merge(var.tags, { Name = "${local.env_name}-public-subnet-${local.azs[count.index]}", scope = "public" })
 }
 
 resource "aws_internet_gateway" "internet_gateway" {
