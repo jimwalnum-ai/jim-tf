@@ -24,12 +24,12 @@ locals {
 
 resource "aws_instance" "ec2_public_instance_1" {
   ami                         = data.aws_ami.al2023.id
-  subnet_id                   = module.vpc-dev.public_subnets[0]
+  subnet_id                   = module.vpc["dev"].public_subnets[0]
   instance_type               = "t3.small"
   iam_instance_profile        = aws_iam_instance_profile.private.name
   vpc_security_group_ids      = [aws_security_group.public_instance.id]
   associate_public_ip_address = true
-  depends_on                  = [module.vpc-dev]
+  depends_on                  = [module.vpc["dev"]]
   user_data                   = <<-EOF
     #!/bin/bash
     install -d -m 700 /home/ec2-user/.ssh
@@ -48,7 +48,7 @@ resource "aws_instance" "ec2_public_instance_1" {
 
 resource "aws_instance" "ec2_public_instance_2" {
   ami           = data.aws_ami.al2023.id
-  subnet_id     = module.vpc-dev.public_subnets[0]
+  subnet_id     = module.vpc["dev"].public_subnets[0]
   instance_type = "t3.medium"
   root_block_device {
     volume_size = 50
@@ -57,7 +57,7 @@ resource "aws_instance" "ec2_public_instance_2" {
   iam_instance_profile        = aws_iam_instance_profile.private.name
   vpc_security_group_ids      = [aws_security_group.public_instance.id]
   associate_public_ip_address = true
-  depends_on                  = [module.vpc-dev]
+  depends_on                  = [module.vpc["dev"]]
   user_data                   = <<-EOF
     #!/bin/bash
     install -d -m 700 /home/ec2-user/.ssh
@@ -82,11 +82,11 @@ resource "aws_iam_instance_profile" "private" {
 
 resource "aws_instance" "ec2_private_instance" {
   ami                    = data.aws_ami.al2023.id
-  subnet_id              = module.vpc-dev.tgw_subnets[0]
+  subnet_id              = module.vpc["dev"].tgw_subnets[0]
   instance_type          = "t3.micro"
   iam_instance_profile   = aws_iam_instance_profile.private.name
   vpc_security_group_ids = [aws_security_group.private_instance.id]
-  depends_on             = [module.vpc-dev]
+  depends_on             = [module.vpc["dev"]]
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -103,7 +103,7 @@ resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
 resource "aws_security_group" "public_instance" {
   name        = "public-default"
   description = "Public instance security group"
-  vpc_id      = module.vpc-dev.vpc_id
+  vpc_id      = module.vpc["dev"].vpc_id
 
   ingress {
     from_port   = 0
@@ -138,7 +138,7 @@ resource "aws_security_group" "public_instance" {
 resource "aws_security_group" "private_instance" {
   name        = "private-default"
   description = "Private instance security group"
-  vpc_id      = module.vpc-dev.vpc_id
+  vpc_id      = module.vpc["dev"].vpc_id
 
   ingress {
     from_port   = 22

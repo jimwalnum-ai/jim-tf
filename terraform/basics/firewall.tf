@@ -88,11 +88,11 @@ resource "aws_networkfirewall_rule_group" "block_cross_vpc" {
       stateful_rule {
         action = "DROP"
         header {
-          destination      = module.vpc-prd.vpc_cidr
+          destination      = module.vpc["prd"].vpc_cidr
           destination_port = "ANY"
           direction        = "ANY"
           protocol         = "IP"
-          source           = module.vpc-dev.vpc_cidr
+          source           = module.vpc["dev"].vpc_cidr
           source_port      = "ANY"
         }
         rule_option {

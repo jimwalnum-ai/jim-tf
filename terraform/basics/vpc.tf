@@ -32,52 +32,27 @@ module "s3-flow-log-bucket" {
   tags            = local.tags
 }
 
-module "vpc-dev" {
+module "vpc" {
+  for_each               = local.spoke_vpcs
   source                 = "../modules/vpc"
   ipv4_ipam_pool_id      = aws_vpc_ipam_pool.regional.id
-  ipv4_netmask_length    = 22
-  name                   = "cs-basics"
-  env                    = "dev"
-  region                 = "us-east-1"
-  private_subnets_count  = 3
-  public_subnets_count   = 2
-  availability_zones     = slice(local.available_azs, 0, max(3, 2))
+  ipv4_netmask_length    = each.value.ipv4_netmask_length
+  name                   = local.vpc_name
+  env                    = each.value.env
+  region                 = each.value.region
+  private_subnets_count  = each.value.private_subnets_count
+  public_subnets_count   = each.value.public_subnets_count
+  availability_zones     = slice(local.available_azs, 0, max(each.value.private_subnets_count, each.value.public_subnets_count))
   transit_gateway        = module.tgw.id
-  create_tgw_routes      = true
-  test                   = true
+  create_tgw_routes      = each.value.create_tgw_routes
+  test                   = each.value.test
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
   endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
-  internal_ingress_cidrs = ["10.0.0.0/8"]
-  tgw_subnet_tags = {
-    "kubernetes.io/cluster/eks-cluster-dev" = "shared"
-    "kubernetes.io/role/internal-elb"       = "1"
-  }
-  tags       = local.tags
-  depends_on = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
-}
-
-module "vpc-prd" {
-  source                 = "../modules/vpc"
-  ipv4_ipam_pool_id      = aws_vpc_ipam_pool.regional.id
-  ipv4_netmask_length    = 22
-  name                   = "cs-basics"
-  env                    = "prd"
-  region                 = "us-east-1"
-  private_subnets_count  = 3
-  availability_zones     = slice(local.available_azs, 0, max(3, 0))
-  transit_gateway        = module.tgw.id
-  create_tgw_routes      = true
-  flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
-  endpoint_access_role   = "arn:aws:iam::${local.acct_id}:role/cs-terraform-role"
-  public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
-  internal_ingress_cidrs = ["10.0.0.0/8"]
-  tgw_subnet_tags = {
-    "kubernetes.io/cluster/eks-cluster-prd" = "shared"
-    "kubernetes.io/role/internal-elb"       = "1"
-  }
-  tags       = local.tags
-  depends_on = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
+  internal_ingress_cidrs = local.internal_ingress_cidrs
+  tgw_subnet_tags        = each.value.tgw_subnet_tags
+  tags                   = local.tags
+  depends_on             = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
 }
 
 #module "vpc-egress" {
@@ -99,19 +74,19 @@ module "vpc-prd" {
 module "vpc-inspect" {
   source                 = "../modules/inspect-vpc"
   ipv4_ipam_pool_id      = aws_vpc_ipam_pool.regional.id
-  ipv4_netmask_length    = 22
-  tgw_subnet_cidr_offset = 6
-  name                   = "cs-basics"
-  env                    = "inspect"
-  region                 = "us-east-1"
+  ipv4_netmask_length    = local.inspect_vpc.ipv4_netmask_length
+  tgw_subnet_cidr_offset = local.inspect_vpc.tgw_subnet_cidr_offset
+  name                   = local.vpc_name
+  env                    = local.inspect_vpc.env
+  region                 = local.inspect_vpc.region
   availability_zones     = local.available_azs
   flow_log_bucket        = module.s3-flow-log-bucket.bucket_arn
   transit_gateway        = module.tgw.id
-  super_cidr_block       = "10.0.0.0/18"
+  super_cidr_block       = local.inspect_vpc.super_cidr_block
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
-  internal_ingress_cidrs = ["10.0.0.0/8"]
+  internal_ingress_cidrs = local.internal_ingress_cidrs
   tags                   = local.tags
-  depends_on             = [module.vpc-dev, module.vpc-prd, module.s3-flow-log-bucket, aws_vpc_ipam.cs-main]
+  depends_on             = [module.vpc, module.s3-flow-log-bucket, aws_vpc_ipam.cs-main]
 }
 
 resource "aws_route_table" "inspection_vpc_tgw_subnet_route_table" {
@@ -137,7 +112,7 @@ resource "aws_route_table" "inspection_vpc_firewall_subnet_route_table" {
   count  = 2
   vpc_id = module.vpc-inspect.vpc_id
   route {
-    cidr_block         = "10.0.0.0/16"
+    cidr_block         = local.tgw_cidr_block
     transit_gateway_id = module.tgw.id
   }
   route {
@@ -163,7 +138,7 @@ resource "aws_route_table" "inspection_vpc_public_subnet_route_table" {
     gateway_id = module.vpc-inspect.igw_id
   }
   route {
-    cidr_block      = "10.0.0.0/16"
+    cidr_block      = local.tgw_cidr_block
     vpc_endpoint_id = element([for ss in aws_networkfirewall_firewall.inspection_vpc_fw.firewall_status[0].sync_states : ss.attachment[0].endpoint_id if ss.attachment[0].subnet_id == module.vpc-inspect.firewall_subnets[count.index].id], 0)
   }
 
@@ -180,20 +155,11 @@ resource "aws_route_table_association" "inspection_vpc_public_subnet_route_table
 }
 
 
-resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-dev" {
-  subnet_ids                                      = module.vpc-dev.tgw_subnets
+resource "aws_ec2_transit_gateway_vpc_attachment" "spoke" {
+  for_each                                        = local.spoke_vpcs
+  subnet_ids                                      = module.vpc[each.key].tgw_subnets
   transit_gateway_id                              = module.tgw.id
-  vpc_id                                          = module.vpc-dev.vpc_id
-  transit_gateway_default_route_table_association = false
-  transit_gateway_default_route_table_propagation = false
-  depends_on                                      = [module.tgw]
-  tags                                            = local.tags
-}
-
-resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-prd" {
-  subnet_ids                                      = module.vpc-prd.tgw_subnets
-  transit_gateway_id                              = module.tgw.id
-  vpc_id                                          = module.vpc-prd.vpc_id
+  vpc_id                                          = module.vpc[each.key].vpc_id
   transit_gateway_default_route_table_association = false
   transit_gateway_default_route_table_propagation = false
   depends_on                                      = [module.tgw]
@@ -219,26 +185,16 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-inspect" {
   tags                                            = local.tags
 }
 
-# Per-environment TGW route tables to isolate dev and prd traffic
-resource "aws_ec2_transit_gateway_route_table" "dev" {
+resource "aws_ec2_transit_gateway_route_table" "spoke" {
+  for_each           = local.spoke_vpcs
   transit_gateway_id = module.tgw.id
-  tags               = merge(local.tags, { Name = "cs-tgw-dev-route-table" })
+  tags               = merge(local.tags, { Name = "cs-tgw-${each.key}-route-table" })
 }
 
-resource "aws_ec2_transit_gateway_route_table" "prd" {
-  transit_gateway_id = module.tgw.id
-  tags               = merge(local.tags, { Name = "cs-tgw-prd-route-table" })
-}
-
-# Associate each spoke VPC with its own route table
-resource "aws_ec2_transit_gateway_route_table_association" "vpc_dev_association" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
-}
-
-resource "aws_ec2_transit_gateway_route_table_association" "vpc_prd_association" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-prd.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
+resource "aws_ec2_transit_gateway_route_table_association" "spoke" {
+  for_each                       = local.spoke_vpcs
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke[each.key].id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke[each.key].id
 }
 
 resource "aws_ec2_transit_gateway_route_table_association" "vpc_inspect_association" {
@@ -246,54 +202,31 @@ resource "aws_ec2_transit_gateway_route_table_association" "vpc_inspect_associat
   transit_gateway_route_table_id = module.tgw.inspection_route_table.id
 }
 
-# Spoke VPCs propagate to the inspection route table (for return traffic)
-resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_dev_propagation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
+resource "aws_ec2_transit_gateway_route_table_propagation" "spoke_to_inspect" {
+  for_each                       = local.spoke_vpcs
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke[each.key].id
   transit_gateway_route_table_id = module.tgw.inspection_route_table.id
 }
 
-resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_prd_propagation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-prd.id
-  transit_gateway_route_table_id = module.tgw.inspection_route_table.id
-}
-
-# Inspection VPC propagates to both per-env route tables
-resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_to_dev" {
+resource "aws_ec2_transit_gateway_route_table_propagation" "inspect_to_spoke" {
+  for_each                       = local.spoke_vpcs
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke[each.key].id
 }
 
-resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_to_prd" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
-}
-
-# Default route to inspection VPC for internet-bound traffic
-resource "aws_ec2_transit_gateway_route" "dev_internet" {
+resource "aws_ec2_transit_gateway_route" "spoke_internet" {
+  for_each                       = local.spoke_vpcs
   destination_cidr_block         = "0.0.0.0/0"
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke[each.key].id
   depends_on                     = [module.tgw]
 }
 
-resource "aws_ec2_transit_gateway_route" "prd_internet" {
-  destination_cidr_block         = "0.0.0.0/0"
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
-  depends_on                     = [module.tgw]
-}
-
-# Blackhole routes prevent cross-environment traffic at the TGW level
-resource "aws_ec2_transit_gateway_route" "dev_blackhole_prd" {
-  destination_cidr_block         = module.vpc-prd.vpc_cidr
+resource "aws_ec2_transit_gateway_route" "blackhole" {
+  for_each                       = local.blackhole_pairs
+  destination_cidr_block         = module.vpc[each.value.dst_key].vpc_cidr
   blackhole                      = true
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
-}
-
-resource "aws_ec2_transit_gateway_route" "prd_blackhole_dev" {
-  destination_cidr_block         = module.vpc-dev.vpc_cidr
-  blackhole                      = true
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.spoke[each.value.src_key].id
 }
 
 

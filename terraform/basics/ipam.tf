@@ -14,7 +14,7 @@ resource "aws_vpc_ipam_pool" "top_level" {
 # provision CIDR to the top-level pool
 resource "aws_vpc_ipam_pool_cidr" "top_level" {
   ipam_pool_id = aws_vpc_ipam_pool.top_level.id
-  cidr         = "10.0.0.0/16"
+  cidr         = local.base_cidr
 }
 
 resource "aws_vpc_ipam_pool" "regional" {
@@ -28,7 +28,7 @@ resource "aws_vpc_ipam_pool" "regional" {
 
 resource "aws_vpc_ipam_pool_cidr" "us-east-1" {
   ipam_pool_id = aws_vpc_ipam_pool.regional.id
-  cidr         = "10.0.0.0/18"
+  cidr         = local.regional_cidr
 }
 
 
