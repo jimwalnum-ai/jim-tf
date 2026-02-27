@@ -1,1 +1,1 @@
-// Deprecated EKS module block removed; use eks.tf instead.
+// Web app resources are in eks_app.tf (deployment, service, HPA).

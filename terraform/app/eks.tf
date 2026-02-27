@@ -13,6 +13,17 @@ data "aws_subnets" "tgw_selected" {
   }
 }
 
+data "aws_subnets" "eks_public" {
+  filter {
+    name   = "tag:scope"
+    values = ["public"]
+  }
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.dev-vpc.id]
+  }
+}
+
 module "eks_cluster" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.0.0"
@@ -20,7 +31,7 @@ module "eks_cluster" {
   name               = "eks-cluster"
   kubernetes_version = "1.34"
   vpc_id             = data.aws_vpc.dev-vpc.id
-  subnet_ids         = concat(data.aws_subnets.tgw_selected.ids, data.aws_subnets.public_selected.ids)
+  subnet_ids         = concat(data.aws_subnets.tgw_selected.ids, data.aws_subnets.eks_public.ids)
   enable_irsa        = true
 
   addons = {
@@ -51,7 +62,7 @@ module "eks_cluster" {
       min_size       = 1
       max_size       = 5
       desired_size   = 1
-      subnet_ids     = data.aws_subnets.public_selected.ids
+      subnet_ids     = data.aws_subnets.eks_public.ids
       iam_role_additional_policies = {
         ecr_scoped_pull = aws_iam_policy.eks_ecr_pull.arn
       }

@@ -28,6 +28,14 @@ job "sqs-scaler" {
       }
 
       template {
+        destination = "local/nomad.env"
+        env         = true
+        data        = <<ENVEOF
+NOMAD_ADDR=http://{{ env "attr.unique.network.ip-address" }}:4646
+ENVEOF
+      }
+
+      template {
         destination = "local/sqs_scaler.py"
         data        = <<PYEOF
 import boto3, json, math, os, logging
@@ -37,7 +45,7 @@ from urllib.error import URLError
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("sqs-scaler")
 
-NOMAD_ADDR = os.getenv("NOMAD_ADDR", "http://${server_private_ip}:4646")
+NOMAD_ADDR = os.getenv("NOMAD_ADDR", "http://localhost:4646")
 REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
 SCALING_RULES = [
@@ -45,7 +53,7 @@ SCALING_RULES = [
         "queue": "${factor_queue_name}",
         "job": "factor-process",
         "group": "process",
-        "min": 0,
+        "min": ${process_min_count},
         "max": ${process_max_count},
         "msgs_per_instance": ${msgs_per_instance},
     },
@@ -53,7 +61,7 @@ SCALING_RULES = [
         "queue": "${factor_result_queue_name}",
         "job": "factor-persist",
         "group": "persist",
-        "min": 0,
+        "min": ${persist_min_count},
         "max": ${persist_max_count},
         "msgs_per_instance": ${msgs_per_instance},
     },
@@ -114,7 +122,6 @@ PYEOF
 
       env {
         AWS_DEFAULT_REGION = "us-east-1"
-        NOMAD_ADDR         = "http://${server_private_ip}:4646"
       }
 
       resources {

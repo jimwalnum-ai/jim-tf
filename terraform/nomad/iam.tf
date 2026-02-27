@@ -130,6 +130,22 @@ resource "aws_iam_role_policy" "nomad_autoscaler" {
   })
 }
 
+resource "aws_iam_role_policy" "nomad_cloud_auto_join" {
+  name = "${local.name_prefix}-cloud-auto-join"
+  role = aws_iam_role.nomad_node.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ec2:DescribeInstances"
+      ]
+      Resource = ["*"]
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "nomad_ssm" {
   role       = aws_iam_role.nomad_node.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

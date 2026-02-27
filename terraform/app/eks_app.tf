@@ -31,6 +31,9 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
         labels = {
           app = "flask-app"
         }
+        annotations = {
+          "src-hash" = local.web_src_hash
+        }
       }
       spec {
         container {
@@ -38,6 +41,16 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
           image = "${aws_ecr_repository.flask_app.repository_url}:latest"
           port {
             container_port = 8000
+          }
+          resources {
+            requests = {
+              cpu    = "250m"
+              memory = "256Mi"
+            }
+            limits = {
+              cpu    = "1000m"
+              memory = "512Mi"
+            }
           }
           env {
             name  = "FACTOR_DB_HOST"
@@ -64,6 +77,24 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
               }
             }
           }
+          liveness_probe {
+            http_get {
+              path = "/health"
+              port = 8000
+            }
+            initial_delay_seconds = 10
+            period_seconds        = 15
+            failure_threshold     = 3
+          }
+          readiness_probe {
+            http_get {
+              path = "/health"
+              port = 8000
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 5
+            failure_threshold     = 3
+          }
         }
       }
     }
@@ -89,6 +120,42 @@ resource "kubernetes_service_v1" "flask_app_service" {
       protocol    = "TCP"
     }
     type = "LoadBalancer" # Use LoadBalancer to expose the service via an ALB
+  }
+}
+
+resource "kubernetes_horizontal_pod_autoscaler_v2" "flask_app_hpa" {
+  metadata {
+    name      = "flask-app-hpa"
+    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+  }
+  spec {
+    scale_target_ref {
+      api_version = "apps/v1"
+      kind        = "Deployment"
+      name        = kubernetes_deployment_v1.flask_app_deployment.metadata[0].name
+    }
+    min_replicas = 2
+    max_replicas = 10
+    metric {
+      type = "Resource"
+      resource {
+        name = "cpu"
+        target {
+          type                = "Utilization"
+          average_utilization = 60
+        }
+      }
+    }
+    metric {
+      type = "Resource"
+      resource {
+        name = "memory"
+        target {
+          type                = "Utilization"
+          average_utilization = 75
+        }
+      }
+    }
   }
 }
 

@@ -1,30 +1,3 @@
-job "factor-process" {
-  datacenters = ["dc1"]
-  region      = "us-east-1"
-  type        = "service"
-
-  group "process" {
-    count = 2
-
-    restart {
-      attempts = 10
-      interval = "5m"
-      delay    = "15s"
-      mode     = "delay"
-    }
-
-    task "process" {
-      driver = "docker"
-
-      config {
-        image   = "python:3.11-slim"
-        command = "/bin/sh"
-        args    = ["-c", "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 'urllib3<2.0' && while true; do python /local/process.py || true; sleep 30; done"]
-      }
-
-      template {
-        destination = "local/process.py"
-        data        = <<PYEOF
 import boto3, datetime, time, os, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -132,32 +105,3 @@ while not done:
     if delete_entries:
         sqs.delete_message_batch(QueueUrl=queue_url, Entries=delete_entries)
         logger.info("deleted_messages=%s", len(delete_entries))
-PYEOF
-      }
-
-      env {
-        AWS_DEFAULT_REGION       = "us-east-1"
-        FACTOR_QUEUE_NAME        = "SQS_FACTOR_DEV"
-        FACTOR_RESULT_QUEUE_NAME = "SQS_FACTOR_RESULT_DEV"
-      }
-
-      resources {
-        cpu    = 256
-        memory = 512
-      }
-
-      service {
-        name     = "factor-process"
-        provider = "consul"
-
-        check {
-          type     = "script"
-          command  = "/bin/sh"
-          args     = ["-c", "pgrep -f process.py"]
-          interval = "30s"
-          timeout  = "5s"
-        }
-      }
-    }
-  }
-}

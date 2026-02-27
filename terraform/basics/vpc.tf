@@ -219,14 +219,26 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "vpc-inspect" {
   tags                                            = local.tags
 }
 
+# Per-environment TGW route tables to isolate dev and prd traffic
+resource "aws_ec2_transit_gateway_route_table" "dev" {
+  transit_gateway_id = module.tgw.id
+  tags               = merge(local.tags, { Name = "cs-tgw-dev-route-table" })
+}
+
+resource "aws_ec2_transit_gateway_route_table" "prd" {
+  transit_gateway_id = module.tgw.id
+  tags               = merge(local.tags, { Name = "cs-tgw-prd-route-table" })
+}
+
+# Associate each spoke VPC with its own route table
 resource "aws_ec2_transit_gateway_route_table_association" "vpc_dev_association" {
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
-  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
 }
 
 resource "aws_ec2_transit_gateway_route_table_association" "vpc_prd_association" {
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-prd.id
-  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
 }
 
 resource "aws_ec2_transit_gateway_route_table_association" "vpc_inspect_association" {
@@ -234,6 +246,7 @@ resource "aws_ec2_transit_gateway_route_table_association" "vpc_inspect_associat
   transit_gateway_route_table_id = module.tgw.inspection_route_table.id
 }
 
+# Spoke VPCs propagate to the inspection route table (for return traffic)
 resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_dev_propagation" {
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-dev.id
   transit_gateway_route_table_id = module.tgw.inspection_route_table.id
@@ -244,16 +257,43 @@ resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_prd_propagation"
   transit_gateway_route_table_id = module.tgw.inspection_route_table.id
 }
 
-resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_propagation" {
+# Inspection VPC propagates to both per-env route tables
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_to_dev" {
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
 }
 
-resource "aws_ec2_transit_gateway_route" "internet" {
+resource "aws_ec2_transit_gateway_route_table_propagation" "vpc_inspect_to_prd" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
+}
+
+# Default route to inspection VPC for internet-bound traffic
+resource "aws_ec2_transit_gateway_route" "dev_internet" {
   destination_cidr_block         = "0.0.0.0/0"
   transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
-  transit_gateway_route_table_id = module.tgw.vpc_route_table.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
   depends_on                     = [module.tgw]
+}
+
+resource "aws_ec2_transit_gateway_route" "prd_internet" {
+  destination_cidr_block         = "0.0.0.0/0"
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.vpc-inspect.id
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
+  depends_on                     = [module.tgw]
+}
+
+# Blackhole routes prevent cross-environment traffic at the TGW level
+resource "aws_ec2_transit_gateway_route" "dev_blackhole_prd" {
+  destination_cidr_block         = module.vpc-prd.vpc_cidr
+  blackhole                      = true
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.dev.id
+}
+
+resource "aws_ec2_transit_gateway_route" "prd_blackhole_dev" {
+  destination_cidr_block         = module.vpc-dev.vpc_cidr
+  blackhole                      = true
+  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.prd.id
 }
 
 

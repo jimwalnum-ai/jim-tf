@@ -89,44 +89,42 @@ resource "helm_release" "cluster_autoscaler" {
   chart      = "cluster-autoscaler"
   version    = "9.43.2"
 
-  set = [
-    {
-      name  = "autoDiscovery.clusterName"
-      value = module.eks_cluster.cluster_name
-    },
-    {
-      name  = "awsRegion"
-      value = data.aws_region.current.id
-    },
-    {
-      name  = "rbac.serviceAccount.create"
-      value = "true"
-    },
-    {
-      name  = "rbac.serviceAccount.name"
-      value = local.cluster_autoscaler_sa_name
-    },
-    {
-      name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = aws_iam_role.cluster_autoscaler.arn
-    },
-    {
-      name  = "extraArgs.balance-similar-node-groups"
-      value = "true"
-    },
-    {
-      name  = "extraArgs.skip-nodes-with-system-pods"
-      value = "false"
-    },
-    {
-      name  = "extraArgs.scale-down-unneeded-time"
-      value = "5m"
-    },
-    {
-      name  = "extraArgs.scale-down-delay-after-add"
-      value = "5m"
-    },
-  ]
+  set {
+    name  = "autoDiscovery.clusterName"
+    value = module.eks_cluster.cluster_name
+  }
+  set {
+    name  = "awsRegion"
+    value = data.aws_region.current.id
+  }
+  set {
+    name  = "rbac.serviceAccount.create"
+    value = "true"
+  }
+  set {
+    name  = "rbac.serviceAccount.name"
+    value = local.cluster_autoscaler_sa_name
+  }
+  set {
+    name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.cluster_autoscaler.arn
+  }
+  set {
+    name  = "extraArgs.balance-similar-node-groups"
+    value = "true"
+  }
+  set {
+    name  = "extraArgs.skip-nodes-with-system-pods"
+    value = "false"
+  }
+  set {
+    name  = "extraArgs.scale-down-unneeded-time"
+    value = "5m"
+  }
+  set {
+    name  = "extraArgs.scale-down-delay-after-add"
+    value = "5m"
+  }
 
   depends_on = [
     aws_iam_role_policy_attachment.cluster_autoscaler,

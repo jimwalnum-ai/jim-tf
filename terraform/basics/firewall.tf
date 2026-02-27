@@ -23,6 +23,9 @@ resource "aws_networkfirewall_firewall_policy" "fw_policy" {
     stateful_rule_group_reference {
       resource_arn = aws_networkfirewall_rule_group.block_domains.arn
     }
+    stateful_rule_group_reference {
+      resource_arn = aws_networkfirewall_rule_group.block_cross_vpc.arn
+    }
   }
 }
 
@@ -71,6 +74,31 @@ resource "aws_networkfirewall_rule_group" "block_domains" {
         generated_rules_type = "DENYLIST"
         target_types         = ["HTTP_HOST", "TLS_SNI"]
         targets              = [".facebook.com", ".twitter.com"]
+      }
+    }
+  }
+}
+
+resource "aws_networkfirewall_rule_group" "block_cross_vpc" {
+  capacity = 10
+  name     = "block-cross-vpc-traffic"
+  type     = "STATEFUL"
+  rule_group {
+    rules_source {
+      stateful_rule {
+        action = "DROP"
+        header {
+          destination      = module.vpc-prd.vpc_cidr
+          destination_port = "ANY"
+          direction        = "ANY"
+          protocol         = "IP"
+          source           = module.vpc-dev.vpc_cidr
+          source_port      = "ANY"
+        }
+        rule_option {
+          keyword  = "sid"
+          settings = ["1000001"]
+        }
       }
     }
   }

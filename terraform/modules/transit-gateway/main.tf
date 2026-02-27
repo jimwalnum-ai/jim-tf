@@ -16,13 +16,6 @@ resource "aws_flow_log" "tgw_flow_log" {
   tags                     = var.tags
 }
 
-resource "aws_ec2_transit_gateway_route_table" "vpc_route_table" {
-  transit_gateway_id = aws_ec2_transit_gateway.tgw.id
-  tags = {
-    Name = "cs-tgw-vpc-route-table"
-  }
-}
-
 resource "aws_ec2_transit_gateway_route_table" "inspection_route_table" {
   transit_gateway_id = aws_ec2_transit_gateway.tgw.id
   tags = {

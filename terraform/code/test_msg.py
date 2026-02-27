@@ -108,16 +108,22 @@ def _resolve_queue_url(queue_name_or_url):
 
 queue_url = _resolve_queue_url(QUEUE_NAME)
 
-MESSAGES_PER_MINUTE = 1000
 MESSAGES_MIN = 1000
 MESSAGES_MAX = 1200
 INTERVAL_SECONDS = 60
+SCHEME_ROTATION_SECONDS = 600
+SCHEME_MIN = 400000
+SCHEME_MAX = 500000000
 BATCH_SIZE = 10
 MAX_WORKERS = 8
 BATCH_DELAY_SECONDS = 0.25
 
 
-def _build_entries(start_index: int, count: int):
+def _pick_scheme():
+    return random.randint(SCHEME_MIN, SCHEME_MAX)
+
+
+def _build_entries(start_index: int, count: int, scheme: int):
     entries = []
     for offset in range(count):
         msg_index = start_index + offset
@@ -128,11 +134,11 @@ def _build_entries(start_index: int, count: int):
                 'MessageAttributes': {
                     'Factor': {
                         'DataType': 'Number',
-                        'StringValue': str(random.randint(4, 400000)),
+                        'StringValue': str(random.randint(4, scheme)),
                     },
                     'Scheme': {
                         'DataType': 'Number',
-                        'StringValue': '400000',
+                        'StringValue': str(scheme),
                     },
                 },
             }
@@ -151,26 +157,31 @@ def _send_batch(entries):
 
 
 while True:
-    target_messages = random.randint(MESSAGES_MIN, MESSAGES_MAX)
-    logger.info("target_messages=%s", target_messages)
-    futures = []
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        for start in range(0, target_messages, BATCH_SIZE):
-            if start % 100 == 0:
-                logger.info("batch_start=%s", start)
-            count = min(BATCH_SIZE, target_messages - start)
-            entries = _build_entries(start, count)
-            futures.append(executor.submit(_send_batch, entries))
-            time.sleep(BATCH_DELAY_SECONDS)
+    scheme = _pick_scheme()
+    scheme_start = time.monotonic()
+    logger.info("new_scheme=%s rotation_seconds=%s", scheme, SCHEME_ROTATION_SECONDS)
 
-    last_message_id = None
-    for future in as_completed(futures):
-        response = future.result()
-        successful = response.get('Successful', [])
-        if successful:
-            last_message_id = successful[-1].get('MessageId')
+    while time.monotonic() - scheme_start < SCHEME_ROTATION_SECONDS:
+        target_messages = random.randint(MESSAGES_MIN, MESSAGES_MAX)
+        logger.info("scheme=%s target_messages=%s", scheme, target_messages)
+        futures = []
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            for start in range(0, target_messages, BATCH_SIZE):
+                if start % 100 == 0:
+                    logger.info("batch_start=%s", start)
+                count = min(BATCH_SIZE, target_messages - start)
+                entries = _build_entries(start, count, scheme)
+                futures.append(executor.submit(_send_batch, entries))
+                time.sleep(BATCH_DELAY_SECONDS)
 
-    if last_message_id:
-        logger.info("last_message_id=%s", last_message_id)
+        last_message_id = None
+        for future in as_completed(futures):
+            response = future.result()
+            successful = response.get('Successful', [])
+            if successful:
+                last_message_id = successful[-1].get('MessageId')
 
-    time.sleep(INTERVAL_SECONDS)
+        if last_message_id:
+            logger.info("last_message_id=%s", last_message_id)
+
+        time.sleep(INTERVAL_SECONDS)

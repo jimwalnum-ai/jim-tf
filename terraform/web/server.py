@@ -28,6 +28,7 @@ def _collect_metrics(rows):
     sent_to_persist = []
     pull_to_persist = []
     queue_to_db = []
+    factor_time = []
     for record in rows:
         if record is None:
             continue
@@ -42,6 +43,7 @@ def _collect_metrics(rows):
             ("sent_to_persist_ms", sent_to_persist),
             ("pull_to_persist_ms", pull_to_persist),
             ("queue_to_db_ms", queue_to_db),
+            ("factor_time_ms", factor_time),
         ]:
             val = record.get(key)
             if val is not None:
@@ -49,7 +51,7 @@ def _collect_metrics(rows):
                     dest.append(float(val))
                 except (TypeError, ValueError):
                     continue
-    return sent_to_persist, pull_to_persist, queue_to_db
+    return sent_to_persist, pull_to_persist, queue_to_db, factor_time
 
 
 def _stats(values):
@@ -79,6 +81,10 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
 
+        if parsed.path == "/health":
+            self._json_response({"status": "ok"})
+            return
+
         if parsed.path == "/api/schemes":
             with _db_conn() as conn:
                 with conn.cursor() as cur:
@@ -100,12 +106,13 @@ class Handler(SimpleHTTPRequestHandler):
                     else:
                         cur.execute("SELECT data FROM factors WHERE (data->>'scheme')::text = %s", (scheme_value,))
                     rows = [row[0] for row in cur.fetchall()]
-            sent, pull, queue = _collect_metrics(rows)
+            sent, pull, queue, factor_time = _collect_metrics(rows)
             self._json_response({
                 "scheme": scheme_value,
                 "sent_to_persist": _stats(sent),
                 "pull_to_persist": _stats(pull),
                 "queue_to_db": _stats(queue),
+                "factor_time": _stats(factor_time),
             })
             return
 

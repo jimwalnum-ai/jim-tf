@@ -1,35 +1,3 @@
-job "factor-test-msg" {
-  datacenters = ["dc1"]
-  region      = "us-east-1"
-  type        = "batch"
-
-  periodic {
-    crons            = ["*/2 * * * *"]
-    prohibit_overlap = true
-  }
-
-  group "test-msg" {
-    count = 1
-
-    restart {
-      attempts = 3
-      interval = "5m"
-      delay    = "15s"
-      mode     = "fail"
-    }
-
-    task "test-msg" {
-      driver = "docker"
-
-      config {
-        image   = "python:3.11-slim"
-        command = "/bin/sh"
-        args    = ["-c", "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 'urllib3<2.0' && python /local/test_msg.py"]
-      }
-
-      template {
-        destination = "local/test_msg.py"
-        data        = <<PYEOF
 import os, random, time, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -113,18 +81,3 @@ while True:
             logger.info("last_message_id=%s", last_message_id)
 
         time.sleep(INTERVAL_SECONDS)
-PYEOF
-      }
-
-      env {
-        AWS_DEFAULT_REGION = "us-east-1"
-        FACTOR_QUEUE_NAME  = "SQS_FACTOR_DEV"
-      }
-
-      resources {
-        cpu    = 256
-        memory = 512
-      }
-    }
-  }
-}

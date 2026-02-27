@@ -3,6 +3,12 @@ variable "env" {
   default = "dev"
 }
 
+variable "server_count" {
+  description = "Number of Nomad/Consul server nodes (use 3 or 5 for HA)."
+  type        = number
+  default     = 3
+}
+
 variable "server_instance_type" {
   type    = string
   default = "t4g.small"
@@ -72,10 +78,22 @@ variable "rds_secret_name" {
   default = "cs-factor-credentials"
 }
 
+variable "process_min_count" {
+  description = "Minimum number of factor-process allocations kept running."
+  type        = number
+  default     = 2
+}
+
 variable "process_max_count" {
   description = "Maximum number of factor-process allocations the SQS scaler can create."
   type        = number
   default     = 6
+}
+
+variable "persist_min_count" {
+  description = "Minimum number of factor-persist allocations kept running."
+  type        = number
+  default     = 2
 }
 
 variable "persist_max_count" {

@@ -1,30 +1,3 @@
-job "factor-persist" {
-  datacenters = ["dc1"]
-  region      = "us-east-1"
-  type        = "service"
-
-  group "persist" {
-    count = 2
-
-    restart {
-      attempts = 10
-      interval = "5m"
-      delay    = "15s"
-      mode     = "delay"
-    }
-
-    task "persist" {
-      driver = "docker"
-
-      config {
-        image   = "python:3.11-slim"
-        command = "/bin/sh"
-        args    = ["-c", "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 'urllib3<2.0' psycopg2-binary && while true; do python /local/persist.py || true; sleep 30; done"]
-      }
-
-      template {
-        destination = "local/persist.py"
-        data        = <<PYEOF
 import boto3, json, os, psycopg2, secrets, time, uuid, threading
 from ast import literal_eval
 from concurrent.futures import ThreadPoolExecutor
@@ -191,32 +164,3 @@ with ThreadPoolExecutor(max_workers=WORKER_COUNT) as pool:
     futures = [pool.submit(_worker, i) for i in range(WORKER_COUNT)]
     for f in futures:
         f.result()
-PYEOF
-      }
-
-      env {
-        AWS_DEFAULT_REGION       = "us-east-1"
-        FACTOR_RESULT_QUEUE_NAME = "SQS_FACTOR_RESULT_DEV"
-        RDS_SECRET_NAME          = "cs-factor-credentials"
-      }
-
-      resources {
-        cpu    = 256
-        memory = 512
-      }
-
-      service {
-        name     = "factor-persist"
-        provider = "consul"
-
-        check {
-          type     = "script"
-          command  = "/bin/sh"
-          args     = ["-c", "pgrep -f persist.py"]
-          interval = "30s"
-          timeout  = "5s"
-        }
-      }
-    }
-  }
-}

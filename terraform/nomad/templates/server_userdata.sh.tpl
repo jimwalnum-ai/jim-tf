@@ -36,6 +36,8 @@ ui_config { enabled = true }
 addresses {
   http = "0.0.0.0"
 }
+
+retry_join = ["provider=aws tag_key=${cluster_tag_key} tag_value=${cluster_tag_value}"]
 CONSULEOF
 
 cat > /etc/systemd/system/consul.service <<'SVCEOF'

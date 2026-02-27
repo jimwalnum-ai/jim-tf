@@ -66,6 +66,23 @@ resource "aws_security_group" "nomad_cluster" {
     cidr_blocks = [data.aws_vpc.dev.cidr_block]
   }
 
+  # ALB health checks and forwarding
+  ingress {
+    description     = "ALB to Nomad API"
+    from_port       = 4646
+    to_port         = 4646
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "ALB to Consul UI"
+    from_port       = 8500
+    to_port         = 8500
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

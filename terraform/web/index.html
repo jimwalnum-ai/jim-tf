@@ -64,6 +64,14 @@
         <div class="row"><span class="label">Min (ms)</span><span class="value" id="queue-min">-</span></div>
         <div class="row"><span class="label">Max (ms)</span><span class="value" id="queue-max">-</span></div>
       </div>
+      <div class="card" id="card-factor">
+        <h2>Factor Time</h2>
+        <div class="row"><span class="label">Count</span><span class="value" id="factor-count">-</span></div>
+        <div class="row"><span class="label">Avg (ms)</span><span class="value" id="factor-avg">-</span></div>
+        <div class="row"><span class="label">Std Dev (ms)</span><span class="value" id="factor-stddev">-</span></div>
+        <div class="row"><span class="label">Min (ms)</span><span class="value" id="factor-min">-</span></div>
+        <div class="row"><span class="label">Max (ms)</span><span class="value" id="factor-max">-</span></div>
+      </div>
     </div>
 
     <script>
@@ -115,6 +123,7 @@
           renderCard("sent", payload.sent_to_persist);
           renderCard("pull", payload.pull_to_persist);
           renderCard("queue", payload.queue_to_db);
+          renderCard("factor", payload.factor_time);
           statusEl.textContent = `Showing metrics for scheme: ${payload.scheme || "All"}`;
         } catch {
           statusEl.textContent = "Request failed.";

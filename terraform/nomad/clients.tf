@@ -28,10 +28,11 @@ resource "aws_launch_template" "client" {
     nomad_version       = var.nomad_version
     consul_version      = var.consul_version
     cni_plugins_version = var.cni_plugins_version
-    server_private_ip   = aws_instance.server.private_ip
     datacenter          = "dc1"
     region              = "us-east-1"
     cpu_total_compute   = var.client_cpu_total_compute
+    cluster_tag_key     = "nomad-cluster"
+    cluster_tag_value   = local.name_prefix
   }))
 
   tag_specifications {

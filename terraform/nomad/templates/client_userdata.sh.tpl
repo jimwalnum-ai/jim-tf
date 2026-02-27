@@ -40,7 +40,7 @@ data_dir   = "/opt/consul/data"
 server     = false
 bind_addr  = "{{ GetPrivateInterfaces | attr \"address\" }}"
 client_addr = "0.0.0.0"
-retry_join = ["${server_private_ip}"]
+retry_join = ["provider=aws tag_key=${cluster_tag_key} tag_value=${cluster_tag_value}"]
 CONSULEOF
 
 cat > /etc/systemd/system/consul.service <<'SVCEOF'
@@ -88,7 +88,6 @@ advertise {
 
 client {
   enabled = true
-  servers = ["${server_private_ip}"]
   cpu_total_compute = ${cpu_total_compute}
   node_class = "auto"
 

@@ -34,7 +34,7 @@ job "nomad-autoscaler" {
 log_level = "INFO"
 
 nomad {
-  address = "http://${server_private_ip}:4646"
+  address = "http://{{ env "attr.unique.network.ip-address" }}:4646"
 }
 
 apm "nomad-apm" {
