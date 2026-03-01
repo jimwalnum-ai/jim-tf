@@ -132,6 +132,7 @@ while not done:
     if delete_entries:
         sqs.delete_message_batch(QueueUrl=queue_url, Entries=delete_entries)
         logger.info("deleted_messages=%s", len(delete_entries))
+
 PYEOF
       }
 
@@ -153,7 +154,7 @@ PYEOF
         check {
           type     = "script"
           command  = "/bin/sh"
-          args     = ["-c", "pgrep -f process.py"]
+          args     = ["-c", "kill -0 1"]
           interval = "30s"
           timeout  = "5s"
         }

@@ -55,21 +55,6 @@ module "vpc" {
   depends_on             = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
 }
 
-#module "vpc-egress" {
-#  source = "../modules/transit-egress-vpc"
-#  ipv4_ipam_pool_id  = aws_vpc_ipam_pool.regional.id
-#  ipv4_netmask_length = 24
-#  name   = "cs-basics"
-#  env    = "egress"
-#  region = "us-east-1"
-#  vpc_attach_cidrs = [module.vpc-dev.vpc_cidr, module.vpc-prd.vpc_cidr]
-#  flow_log_bucket = module.s3-flow-log-bucket.bucket_arn
-#  transit_gateway = module.tgw.id
-#  firewall_endpoint = element(flatten(resource.aws_networkfirewall_firewall.inspection_vpc_fw.firewall_status[0].sync_states[*].attachment[*].endpoint_id),0)
-#  tags = local.tags
-#  depends_on = [module.vpc-dev,module.vpc-prd,module.s3-flow-log-bucket,aws_vpc_ipam.cs-main]
-#}
-
 # Inspection vpc for Network firewall 
 module "vpc-inspect" {
   source                 = "../modules/inspect-vpc"

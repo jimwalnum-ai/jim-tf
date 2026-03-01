@@ -30,12 +30,12 @@ job "factor-test-msg" {
       template {
         destination = "local/test_msg.py"
         data        = <<PYEOF
-import os, sys, random, time, logging
+import os, random, time, logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import boto3
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), stream=sys.stdout)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 sqs = boto3.client('sqs', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
@@ -49,7 +49,7 @@ def _resolve_queue_url(queue_name_or_url):
 queue_url = _resolve_queue_url(QUEUE_NAME)
 
 MESSAGES_MIN = 1000
-MESSAGES_MAX = 25000
+MESSAGES_MAX = 1200
 INTERVAL_SECONDS = 60
 SCHEME_ROTATION_SECONDS = 600
 SCHEME_MIN = 400000
@@ -113,6 +113,7 @@ while True:
             logger.info("last_message_id=%s", last_message_id)
 
         time.sleep(INTERVAL_SECONDS)
+
 PYEOF
       }
 

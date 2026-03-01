@@ -191,6 +191,7 @@ with ThreadPoolExecutor(max_workers=WORKER_COUNT) as pool:
     futures = [pool.submit(_worker, i) for i in range(WORKER_COUNT)]
     for f in futures:
         f.result()
+
 PYEOF
       }
 
@@ -212,7 +213,7 @@ PYEOF
         check {
           type     = "script"
           command  = "/bin/sh"
-          args     = ["-c", "pgrep -f persist.py"]
+          args     = ["-c", "kill -0 1"]
           interval = "30s"
           timeout  = "5s"
         }

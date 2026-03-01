@@ -30,6 +30,7 @@ resource "local_file" "process_job" {
     factor_queue_name        = var.factor_queue_name
     factor_result_queue_name = var.factor_result_queue_name
     process_min_count        = var.process_min_count
+    process_py               = file("${path.module}/scripts/process.py")
   })
 }
 
@@ -40,5 +41,15 @@ resource "local_file" "persist_job" {
     factor_result_queue_name = var.factor_result_queue_name
     rds_secret_name          = var.rds_secret_name
     persist_min_count        = var.persist_min_count
+    persist_py               = file("${path.module}/scripts/persist.py")
+  })
+}
+
+resource "local_file" "test_msg_job" {
+  filename = "${path.module}/jobs/test_msg.nomad.hcl"
+  content = templatefile("${path.module}/templates/test_msg.nomad.hcl.tpl", {
+    docker_image      = var.docker_tasks_image
+    factor_queue_name = var.factor_queue_name
+    test_msg_py       = file("${path.module}/scripts/test_msg.py")
   })
 }

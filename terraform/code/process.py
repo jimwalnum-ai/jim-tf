@@ -43,7 +43,9 @@ def _build_entries(index, message):
     scheme = int(message["MessageAttributes"]["Scheme"]["StringValue"])
     sent_time = int(message["Attributes"]["SentTimestamp"])
     seq = message["MessageId"]
+    t0 = time.monotonic()
     factor_list = do_factor(factor)
+    factor_time_ms = int((time.monotonic() - t0) * 1000)
     ms = max(0, pulled_time_ms - sent_time)
 
     send_entry = {
@@ -77,6 +79,10 @@ def _build_entries(index, message):
             'ms': {
                 'DataType': 'Number',
                 'StringValue': str(ms)
+            },
+            'FactorTime': {
+                'DataType': 'Number',
+                'StringValue': str(factor_time_ms)
             }
         },
         'MessageBody': 'Factor'

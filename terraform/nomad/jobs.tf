@@ -34,7 +34,7 @@ resource "terraform_data" "job_autoscaler" {
   depends_on = [terraform_data.wait_for_nomad]
 
   provisioner "local-exec" {
-    command = "nomad job run ${local_file.autoscaler_job.filename}"
+    command = "nomad job run -detach ${local_file.autoscaler_job.filename}"
     environment = {
       NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
     }
@@ -47,7 +47,7 @@ resource "terraform_data" "job_factor_process" {
   depends_on = [terraform_data.wait_for_nomad]
 
   provisioner "local-exec" {
-    command = "nomad job run ${local_file.process_job.filename}"
+    command = "nomad job run -detach ${local_file.process_job.filename}"
     environment = {
       NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
     }
@@ -60,7 +60,7 @@ resource "terraform_data" "job_factor_persist" {
   depends_on = [terraform_data.wait_for_nomad]
 
   provisioner "local-exec" {
-    command = "nomad job run ${local_file.persist_job.filename}"
+    command = "nomad job run -detach ${local_file.persist_job.filename}"
     environment = {
       NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
     }
@@ -73,7 +73,20 @@ resource "terraform_data" "job_sqs_scaler" {
   depends_on = [terraform_data.wait_for_nomad]
 
   provisioner "local-exec" {
-    command = "nomad job run ${local_file.sqs_scaler_job.filename}"
+    command = "nomad job run -detach ${local_file.sqs_scaler_job.filename}"
+    environment = {
+      NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
+    }
+  }
+}
+
+resource "terraform_data" "job_factor_test_msg" {
+  triggers_replace = local_file.test_msg_job.content
+
+  depends_on = [terraform_data.wait_for_nomad]
+
+  provisioner "local-exec" {
+    command = "nomad job run -detach ${local_file.test_msg_job.filename}"
     environment = {
       NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
     }

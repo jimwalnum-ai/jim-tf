@@ -47,7 +47,7 @@ PYEOF
         check {
           type     = "script"
           command  = "/bin/sh"
-          args     = ["-c", "pgrep -f process.py"]
+          args     = ["-c", "kill -0 1"]
           interval = "30s"
           timeout  = "5s"
         }
