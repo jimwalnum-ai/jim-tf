@@ -17,8 +17,9 @@ resource "terraform_data" "flask_app_image" {
       set -e
       aws ecr get-login-password --region ${data.aws_region.current.id} \
         | docker login --username AWS --password-stdin ${aws_ecr_repository.flask_app.repository_url}
-      docker build -t ${aws_ecr_repository.flask_app.repository_url}:latest .
-      docker push ${aws_ecr_repository.flask_app.repository_url}:latest
+      docker buildx build --platform linux/arm64 \
+        -t ${aws_ecr_repository.flask_app.repository_url}:latest \
+        --push .
     EOT
   }
 }

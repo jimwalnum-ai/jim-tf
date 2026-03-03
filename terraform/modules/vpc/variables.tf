@@ -98,6 +98,12 @@ variable "transit_gateway" {
   default     = ""
 }
 
+variable "use_transit_gateway" {
+  type        = bool
+  description = "Use transit gateway for routing. When false, creates a standalone VPC with IGW and NAT gateways."
+  default     = true
+}
+
 variable "create_tgw_routes" {
   type        = bool
   description = "Create TGW route tables and associations"

@@ -74,6 +74,7 @@ resource "aws_db_instance" "factor" {
   allocated_storage      = 5
   engine                 = "postgres"
   engine_version         = "17.2"
+  db_name                = var.web_db_name
   username               = "fadmin"
   password               = random_password.master_password.result
   db_subnet_group_name   = aws_db_subnet_group.factor.name

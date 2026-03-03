@@ -23,6 +23,24 @@ def _db_conn():
     return psycopg2.connect(**params)
 
 
+def _ensure_table():
+    try:
+        conn = _db_conn()
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS factors (
+                    sequence UUID PRIMARY KEY,
+                    data JSONB NOT NULL
+                )
+                """
+            )
+        conn.close()
+    except Exception as exc:
+        print(f"Warning: could not ensure factors table exists: {exc}")
+
+
 def _collect_metrics(rows):
     """Extract timing metrics from each row's data dict."""
     sent_to_persist = []
@@ -124,6 +142,8 @@ def main():
     server_address = ("", port)
     directory = os.path.dirname(os.path.abspath(__file__))
     handler = lambda *args, **kwargs: Handler(*args, directory=directory, **kwargs)
+    TCPServer.allow_reuse_address = True
+    _ensure_table()
     with TCPServer(server_address, handler) as httpd:
         print(f"Serving on http://localhost:{port}")
         httpd.serve_forever()

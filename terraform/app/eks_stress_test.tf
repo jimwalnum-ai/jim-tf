@@ -5,6 +5,8 @@ resource "kubernetes_namespace_v1" "stress_test_namespace" {
 }
 
 resource "kubernetes_deployment_v1" "stress_test_deployment" {
+  depends_on = [module.eks_node_group]
+
   metadata {
     name      = "stress-test"
     namespace = kubernetes_namespace_v1.stress_test_namespace.metadata[0].name
@@ -25,7 +27,8 @@ resource "kubernetes_deployment_v1" "stress_test_deployment" {
       spec {
         container {
           name  = "stress-test"
-          image = "${aws_ecr_repository.stress_test.repository_url}:latest"
+          image             = "${aws_ecr_repository.stress_test.repository_url}:latest"
+          image_pull_policy = "Always"
           port {
             container_port = 8080
           }

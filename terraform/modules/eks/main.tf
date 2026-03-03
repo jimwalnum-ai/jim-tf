@@ -4,6 +4,8 @@ resource "aws_eks_cluster" "cluster" {
   version  = var.kubernetes_version
   role_arn = aws_iam_role.cluster.arn
 
+  bootstrap_self_managed_addons = var.bootstrap_self_managed_addons
+
   enabled_cluster_log_types = var.enabled_cluster_log_types
 
   vpc_config {

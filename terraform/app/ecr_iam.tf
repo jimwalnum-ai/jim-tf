@@ -48,7 +48,7 @@ resource "aws_ecr_repository_policy" "flask_app" {
         Sid       = "AllowEKSNodePull"
         Effect    = "Allow"
         Principal = {
-          AWS = module.eks_cluster.eks_managed_node_groups["general_purpose"].iam_role_arn
+          AWS = module.eks_node_group.iam_role_arn
         }
         Action = [
           "ecr:BatchCheckLayerAvailability",
@@ -87,7 +87,7 @@ resource "aws_ecr_repository_policy" "stress_test" {
         Sid       = "AllowEKSNodePull"
         Effect    = "Allow"
         Principal = {
-          AWS = module.eks_cluster.eks_managed_node_groups["general_purpose"].iam_role_arn
+          AWS = module.eks_node_group.iam_role_arn
         }
         Action = [
           "ecr:BatchCheckLayerAvailability",

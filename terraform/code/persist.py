@@ -53,6 +53,22 @@ def _ensure_db(params, name):
 
 conn_params = _build_conn_params(sec_data)
 
+def _ensure_table(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factors (
+                sequence UUID PRIMARY KEY,
+                data JSONB NOT NULL
+            )
+            """
+        )
+
+_init_conn = _ensure_db(conn_params, db_name)
+_init_conn.autocommit = True
+_ensure_table(_init_conn)
+_init_conn.close()
+
 def _resolve_queue_url(queue_name_or_url):
     if queue_name_or_url.startswith("https://"):
         return queue_name_or_url

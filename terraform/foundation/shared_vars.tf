@@ -10,7 +10,7 @@ variable "enable_ecs" {
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csx2"
+  prefix            = "csx8"
   enable_ecs        = var.enable_ecs
   env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
@@ -42,11 +42,11 @@ terraform {
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = ">= 3.0.0"
+      version = "~> 2.35"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "= 2.12"
+      version = ">= 2.12.0"
     }
   }
 }

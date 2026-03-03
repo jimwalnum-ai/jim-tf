@@ -19,6 +19,9 @@ locals {
   )
   public_ingress_cidrs     = var.public_ingress_cidrs
   public_ingress_cidrs_map = { for idx, cidr in local.public_ingress_cidrs : cidr => idx }
+
+  standalone = !var.use_transit_gateway
+  create_igw = local.standalone || var.create_igw || var.test
 }
 
 output "az" {
@@ -186,6 +189,54 @@ resource "aws_network_acl_rule" "private_outbound_internal" {
   cidr_block     = each.value.cidr
 }
 
+resource "aws_network_acl_rule" "private_outbound_http" {
+  count          = local.standalone ? 1 : 0
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 500
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 80
+  to_port        = 80
+}
+
+resource "aws_network_acl_rule" "private_outbound_https" {
+  count          = local.standalone ? 1 : 0
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 510
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 443
+  to_port        = 443
+}
+
+resource "aws_network_acl_rule" "private_outbound_ephemeral" {
+  count          = local.standalone ? 1 : 0
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 520
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+
+resource "aws_network_acl_rule" "private_inbound_ephemeral" {
+  count          = local.standalone ? 1 : 0
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 500
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
+}
+
 # Subnets
 resource "aws_subnet" "tgw_subnets" {
   count             = var.private_subnets_count
@@ -213,7 +264,7 @@ resource "aws_subnet" "public_subnets" {
 }
 
 resource "aws_internet_gateway" "internet_gateway" {
-  count  = var.create_igw || var.test ? 1 : 0
+  count  = local.create_igw ? 1 : 0
   vpc_id = aws_vpc.vpc.id
   tags = {
     Name = "${local.env_name}-igw"
@@ -221,7 +272,7 @@ resource "aws_internet_gateway" "internet_gateway" {
 }
 
 resource "aws_route_table" "internet_gateway" {
-  count  = var.create_igw || var.test ? 1 : 0
+  count  = local.create_igw ? 1 : 0
   vpc_id = aws_vpc.vpc.id
   route {
     cidr_block = "0.0.0.0/0"
@@ -230,26 +281,26 @@ resource "aws_route_table" "internet_gateway" {
 }
 
 resource "aws_route_table_association" "internet_gateway" {
-  count          = var.create_igw || var.test ? var.public_subnets_count : 0
+  count          = local.create_igw ? var.public_subnets_count : 0
   subnet_id      = aws_subnet.public_subnets[count.index].id
   route_table_id = aws_route_table.internet_gateway[0].id
 }
 
 resource "aws_eip" "nat_gateway" {
-  count = var.create_nat ? 1 : 0
+  count = var.use_transit_gateway && var.create_nat ? 1 : 0
 }
 
 resource "aws_nat_gateway" "nat_gateway" {
-  count         = var.create_nat ? var.private_subnets_count : 0
+  count         = var.use_transit_gateway && var.create_nat ? var.private_subnets_count : 0
   allocation_id = aws_eip.nat_gateway[0].id
   subnet_id     = aws_subnet.tgw_subnets[count.index].id
   tags = {
-    "Name" = ""
+    "Name" = "${local.env_name}-nat-gw-${local.azs[count.index]}"
   }
 }
 
 resource "aws_route_table" "nat_gateway" {
-  count  = var.create_nat ? 1 : 0
+  count  = var.use_transit_gateway && var.create_nat ? 1 : 0
   vpc_id = aws_vpc.vpc.id
   route {
     cidr_block     = "0.0.0.0/0"
@@ -258,7 +309,7 @@ resource "aws_route_table" "nat_gateway" {
 }
 
 resource "aws_route_table" "tgw_subnets" {
-  count  = var.create_tgw_routes ? 1 : 0
+  count  = var.use_transit_gateway && var.create_tgw_routes ? 1 : 0
   vpc_id = aws_vpc.vpc.id
   route {
     cidr_block         = "0.0.0.0/0"
@@ -267,26 +318,66 @@ resource "aws_route_table" "tgw_subnets" {
 }
 
 resource "aws_route_table" "protected_subnets" {
+  count  = var.use_transit_gateway ? 1 : 0
   vpc_id = aws_vpc.vpc.id
 }
 
 resource "aws_route_table_association" "tgw_subnets" {
-  count          = var.create_tgw_routes ? var.private_subnets_count : 0
+  count          = var.use_transit_gateway && var.create_tgw_routes ? var.private_subnets_count : 0
   subnet_id      = aws_subnet.tgw_subnets[count.index].id
   route_table_id = aws_route_table.tgw_subnets[0].id
 }
 
 resource "aws_route_table_association" "protected_subnets" {
-  count          = var.private_subnets_count
+  count          = var.use_transit_gateway ? var.private_subnets_count : 0
   subnet_id      = aws_subnet.protected_subnets[count.index].id
-  route_table_id = aws_route_table.protected_subnets.id
+  route_table_id = aws_route_table.protected_subnets[0].id
 }
 
-#resource "aws_route_table_association" "nat_gateway" {
-#  count = var.create_nat ? 1 : 0
-#  subnet_id = aws_subnet.private_subnets[count.index].id
-#  route_table_id = aws_route_table.nat_gateway[count.index].id
-#}
+###########################
+# Standalone mode (no TGW)
+###########################
+
+resource "aws_eip" "standalone_nat" {
+  count = local.standalone ? var.public_subnets_count : 0
+  tags = {
+    Name = "${local.env_name}-nat-eip-${local.azs[count.index]}"
+  }
+}
+
+resource "aws_nat_gateway" "standalone_nat" {
+  count         = local.standalone ? var.public_subnets_count : 0
+  allocation_id = aws_eip.standalone_nat[count.index].id
+  subnet_id     = aws_subnet.public_subnets[count.index].id
+  tags = {
+    Name = "${local.env_name}-nat-gw-${local.azs[count.index]}"
+  }
+  depends_on = [aws_internet_gateway.internet_gateway]
+}
+
+resource "aws_route_table" "standalone_private" {
+  count  = local.standalone ? var.public_subnets_count : 0
+  vpc_id = aws_vpc.vpc.id
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.standalone_nat[count.index].id
+  }
+  tags = {
+    Name = "${local.env_name}-private-rt-${local.azs[count.index]}"
+  }
+}
+
+resource "aws_route_table_association" "standalone_tgw_subnets" {
+  count          = local.standalone && var.public_subnets_count > 0 ? var.private_subnets_count : 0
+  subnet_id      = aws_subnet.tgw_subnets[count.index].id
+  route_table_id = aws_route_table.standalone_private[count.index % var.public_subnets_count].id
+}
+
+resource "aws_route_table_association" "standalone_protected_subnets" {
+  count          = local.standalone && var.public_subnets_count > 0 ? var.private_subnets_count : 0
+  subnet_id      = aws_subnet.protected_subnets[count.index].id
+  route_table_id = aws_route_table.standalone_private[count.index % var.public_subnets_count].id
+}
 
 resource "aws_network_acl_association" "tgw_sub_assoc" {
   count          = var.private_subnets_count

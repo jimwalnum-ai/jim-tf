@@ -15,6 +15,8 @@ resource "kubernetes_secret_v1" "flask_app_db" {
 }
 
 resource "kubernetes_deployment_v1" "flask_app_deployment" {
+  depends_on = [module.eks_node_group]
+
   metadata {
     name      = "flask-app-deployment"
     namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
@@ -38,7 +40,8 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
       spec {
         container {
           name  = "flask-app-container"
-          image = "${aws_ecr_repository.flask_app.repository_url}:latest"
+          image             = "${aws_ecr_repository.flask_app.repository_url}:latest"
+          image_pull_policy = "Always"
           port {
             container_port = 8000
           }

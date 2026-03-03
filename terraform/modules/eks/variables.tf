@@ -4,6 +4,12 @@ variable "cluster_name" {
   default     = "eks-cluster-dev"
 }
 
+variable "bootstrap_self_managed_addons" {
+  type        = bool
+  description = "Whether to bootstrap default self-managed add-ons (vpc-cni, kube-proxy, coredns). Set to false when using Cilium as the CNI."
+  default     = false
+}
+
 variable "kubernetes_version" {
   type        = string
   description = "Kubernetes version for the cluster and node groups."

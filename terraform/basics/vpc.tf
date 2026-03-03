@@ -51,6 +51,7 @@ module "vpc" {
   public_ingress_cidrs   = [chomp(file("../../ip.txt"))]
   internal_ingress_cidrs = local.internal_ingress_cidrs
   tgw_subnet_tags        = each.value.tgw_subnet_tags
+  use_transit_gateway    = false
   tags                   = local.tags
   depends_on             = [module.s3-flow-log-bucket, module.tgw, aws_vpc_ipam.cs-main]
 }
