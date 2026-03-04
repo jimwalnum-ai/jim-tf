@@ -41,3 +41,19 @@ module "eks_node_group" {
 
   depends_on = [helm_release.cilium]
 }
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name                = module.eks_cluster.cluster_name
+  addon_name                  = "coredns"
+  addon_version               = data.aws_eks_addon_version.coredns.version
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  depends_on = [module.eks_node_group]
+}
+
+data "aws_eks_addon_version" "coredns" {
+  addon_name         = "coredns"
+  kubernetes_version = module.eks_cluster.cluster_version
+  most_recent        = true
+}

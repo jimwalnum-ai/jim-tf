@@ -10,7 +10,7 @@ variable "enable_ecs" {
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csx8"
+  prefix            = "csx2"
   enable_ecs        = var.enable_ecs
   env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}

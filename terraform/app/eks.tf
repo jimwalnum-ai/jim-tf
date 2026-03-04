@@ -140,12 +140,6 @@ module "eks_cluster" {
   subnet_ids         = concat(data.aws_subnets.tgw_selected.ids, data.aws_subnets.eks_public.ids)
   enable_irsa        = true
 
-  addons = {
-    coredns = {
-      most_recent = true
-    }
-  }
-
   endpoint_private_access = true
   endpoint_public_access  = true
 
