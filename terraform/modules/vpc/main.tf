@@ -61,11 +61,47 @@ resource "aws_network_acl" "public_acl" {
   }
 }
 
+resource "aws_network_acl_rule" "public_allow_all_inbound" {
+  network_acl_id = aws_network_acl.public_acl.id
+  rule_number    = 1
+  egress         = false
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+}
+
+resource "aws_network_acl_rule" "public_allow_all_outbound" {
+  network_acl_id = aws_network_acl.public_acl.id
+  rule_number    = 1
+  egress         = true
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+}
+
 resource "aws_network_acl" "private_acl" {
   vpc_id = aws_vpc.vpc.id
   tags = {
     Name = "${local.env_name}-private-network-acl"
   }
+}
+
+resource "aws_network_acl_rule" "private_allow_all_inbound" {
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 1
+  egress         = false
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+}
+
+resource "aws_network_acl_rule" "private_allow_all_outbound" {
+  network_acl_id = aws_network_acl.private_acl.id
+  rule_number    = 1
+  egress         = true
+  protocol       = "-1"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
 }
 
 resource "aws_network_acl_rule" "public_inbound_ssh" {

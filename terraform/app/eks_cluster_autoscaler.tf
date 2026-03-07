@@ -1,8 +1,6 @@
 locals {
   cluster_autoscaler_namespace = "kube-system"
   cluster_autoscaler_sa_name   = "cluster-autoscaler"
-  # Use the legacy OIDC provider that matches the cluster's actual token issuer URL
-  legacy_oidc_provider_url = replace(aws_iam_openid_connect_provider.eks_legacy_oidc.arn, "/^arn:.*:oidc-provider\\//", "")
 }
 
 # IAM policy granting the Cluster Autoscaler permission to inspect and modify ASGs
@@ -60,13 +58,13 @@ resource "aws_iam_role" "cluster_autoscaler" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.eks_legacy_oidc.arn
+          Federated = module.eks_cluster.oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${local.legacy_oidc_provider_url}:aud" = "sts.amazonaws.com"
-            "${local.legacy_oidc_provider_url}:sub" = "system:serviceaccount:${local.cluster_autoscaler_namespace}:${local.cluster_autoscaler_sa_name}"
+            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.cluster_autoscaler_namespace}:${local.cluster_autoscaler_sa_name}"
           }
         }
       }

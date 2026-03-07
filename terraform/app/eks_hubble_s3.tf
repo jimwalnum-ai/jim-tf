@@ -54,13 +54,13 @@ resource "aws_iam_role" "fluent_bit" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.eks_legacy_oidc.arn
+          Federated = module.eks_cluster.oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${local.legacy_oidc_provider_url}:aud" = "sts.amazonaws.com"
-            "${local.legacy_oidc_provider_url}:sub" = "system:serviceaccount:${local.fluent_bit_namespace}:${local.fluent_bit_sa_name}"
+            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.fluent_bit_namespace}:${local.fluent_bit_sa_name}"
           }
         }
       }
@@ -98,7 +98,7 @@ resource "helm_release" "fluent_bit" {
   namespace  = local.fluent_bit_namespace
 
   wait    = true
-  timeout = 300
+  timeout = 600
 
   values = [<<-YAML
     serviceAccount:

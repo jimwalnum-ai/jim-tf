@@ -1,4 +1,5 @@
 locals {
+  use_transit_gateway    = false
   base_network           = "10.0.0.0"
   base_cidr              = "${local.base_network}/16"
   vpc_name               = "cs-basics"

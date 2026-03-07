@@ -5,9 +5,8 @@ module "eks_node_group" {
   name         = "general-purpose"
   cluster_name = module.eks_cluster.cluster_name
 
-  cluster_primary_security_group_id = module.eks_cluster.cluster_primary_security_group_id
-  vpc_security_group_ids            = [module.eks_cluster.node_security_group_id]
-  cluster_service_cidr              = module.eks_cluster.cluster_service_cidr
+  vpc_security_group_ids = [module.eks_cluster.node_security_group_id]
+  cluster_service_cidr   = module.eks_cluster.cluster_service_cidr
 
   subnet_ids     = data.aws_subnets.eks_public.ids
   ami_type       = "AL2023_ARM_64_STANDARD"

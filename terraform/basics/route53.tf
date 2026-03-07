@@ -24,7 +24,7 @@ resource "aws_route53_record" "git" {
   name    = "git.crimsonscallion.com"
   type    = "A"
   ttl     = 300
-  records = [aws_instance.ec2_public_instance_2.private_ip]
+  records = [aws_instance.gitlab.private_ip]
 }
 
 resource "aws_route53_record" "ldap" {

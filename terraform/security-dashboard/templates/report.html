@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Report — Cilium Security</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="container header-inner">
+      <div class="logo">
+        <div class="logo-icon">&#x1f6e1;</div>
+        <h1>Cilium Security <span>Dashboard</span></h1>
+      </div>
+      <div class="cluster-badge">{{ cluster }}</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <a href="/" class="back-link">&larr; Back to dashboard</a>
+
+    <div class="report-header">
+      <h2>
+        Security Report
+        {% if report.status == 'clean' %}
+        <span class="badge badge-clean">Clean</span>
+        {% elif report.max_severity is defined %}
+        <span class="badge badge-{{ report.max_severity | lower }}">{{ report.max_severity }}</span>
+        {% else %}
+        <span class="badge badge-alert">Alert</span>
+        {% endif %}
+      </h2>
+      <div class="report-meta">
+        <dl>
+          <dt>Timestamp</dt>
+          <dd>{{ report.timestamp[:19] | replace('T', ' ') }} UTC</dd>
+        </dl>
+        <dl>
+          <dt>Cluster</dt>
+          <dd>{{ report.cluster }}</dd>
+        </dl>
+        <dl>
+          <dt>Flows Analyzed</dt>
+          <dd>{{ "{:,}".format(report.flows_analyzed) }}</dd>
+        </dl>
+        <dl>
+          <dt>Raw Alerts</dt>
+          <dd>{{ report.raw_alerts | length }}</dd>
+        </dl>
+        <dl>
+          <dt>Status</dt>
+          <dd>{{ report.status }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    {% set analysis = report.get('analysis', {}) %}
+    {% if analysis.summary %}
+    <div class="incident-card" style="margin-bottom: 24px;">
+      <div class="incident-card-header">
+        <h3>Summary</h3>
+      </div>
+      <p>{{ analysis.summary }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Incidents -->
+    {% set incidents = analysis.get('incidents', []) %}
+    {% if incidents %}
+    <div class="section-header">
+      <h2>Incidents ({{ incidents | length }})</h2>
+    </div>
+
+    {% for inc in incidents %}
+    <div class="incident-card">
+      <div class="incident-card-header">
+        <span class="badge badge-{{ inc.severity | lower }}">{{ inc.severity }}</span>
+        <h3>{{ inc.title }}</h3>
+      </div>
+      <p>{{ inc.description }}</p>
+
+      {% if inc.affected_workloads %}
+      <div class="workloads" style="margin-top: 10px;">
+        {% for w in inc.affected_workloads %}
+        <span class="workload-tag">{{ w }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if inc.threat_type %}
+      <p style="margin-top: 10px; font-size: 13px;">
+        <strong style="color: var(--text-muted);">Threat type:</strong> {{ inc.threat_type }}
+      </p>
+      {% endif %}
+
+      {% if inc.recommendation %}
+      <div class="recommendation">
+        <strong>Recommendation:</strong> {{ inc.recommendation }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" style="padding: 40px 24px;">
+      <div class="icon" style="font-size: 36px;">&#x2705;</div>
+      <p>No incidents detected during this scan.</p>
+    </div>
+    {% endif %}
+
+    <!-- Raw Alerts -->
+    {% if report.raw_alerts %}
+    <details class="raw-alerts">
+      <summary>Raw Rule-Based Alerts ({{ report.raw_alerts | length }})</summary>
+      <pre>{{ report.raw_alerts | tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+  </main>
+</body>
+</html>

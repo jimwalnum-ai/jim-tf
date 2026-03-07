@@ -146,6 +146,8 @@ module "eks_cluster" {
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_cluster_creator_admin_permissions = true
 
+  create_primary_security_group_tags = false
+
   node_security_group_additional_rules = {
     ingress_nlb_nodeport = {
       description = "Allow NLB health checks and traffic on NodePort range"

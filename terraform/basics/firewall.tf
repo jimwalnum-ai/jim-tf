@@ -1,15 +1,6 @@
-resource "aws_networkfirewall_firewall" "inspection_vpc_fw" {
-  name                = "NetworkFirewall"
-  firewall_policy_arn = aws_networkfirewall_firewall_policy.fw_policy.arn
-  vpc_id              = module.vpc-inspect.vpc_id
-  subnet_mapping {
-    subnet_id = module.vpc-inspect.firewall_subnets[0].id
-  }
-  subnet_mapping {
-    subnet_id = module.vpc-inspect.firewall_subnets[1].id
-  }
-  depends_on = [module.vpc-inspect]
-}
+###########################
+# Shared policy & rules
+###########################
 
 resource "aws_networkfirewall_firewall_policy" "fw_policy" {
   name = "firewall-policy"
@@ -104,6 +95,10 @@ resource "aws_networkfirewall_rule_group" "block_cross_vpc" {
   }
 }
 
+###########################
+# Shared logging infra
+###########################
+
 resource "aws_cloudwatch_log_group" "fw_alert_log_group" {
   name              = "/aws/network-firewall/alert"
   retention_in_days = 365
@@ -144,8 +139,68 @@ resource "aws_s3_bucket_lifecycle_configuration" "fw_flow_bucket_retention" {
   }
 }
 
-resource "aws_networkfirewall_logging_configuration" "fw_alert_logging_configuration" {
-  firewall_arn = aws_networkfirewall_firewall.inspection_vpc_fw.arn
+###################################
+# Inspection VPC firewall (TGW mode)
+###################################
+
+resource "aws_networkfirewall_firewall" "inspection_vpc_fw" {
+  count               = local.use_transit_gateway ? 1 : 0
+  name                = "NetworkFirewall"
+  firewall_policy_arn = aws_networkfirewall_firewall_policy.fw_policy.arn
+  vpc_id              = module.vpc-inspect[0].vpc_id
+  subnet_mapping {
+    subnet_id = module.vpc-inspect[0].firewall_subnets[0].id
+  }
+  subnet_mapping {
+    subnet_id = module.vpc-inspect[0].firewall_subnets[1].id
+  }
+  depends_on = [module.vpc-inspect]
+}
+
+resource "aws_networkfirewall_logging_configuration" "inspection_fw_logging" {
+  count        = local.use_transit_gateway ? 1 : 0
+  firewall_arn = aws_networkfirewall_firewall.inspection_vpc_fw[0].arn
+  logging_configuration {
+    log_destination_config {
+      log_destination = {
+        logGroup = aws_cloudwatch_log_group.fw_alert_log_group.name
+      }
+      log_destination_type = "CloudWatchLogs"
+      log_type             = "ALERT"
+    }
+    log_destination_config {
+      log_destination = {
+        bucketName = aws_s3_bucket.fw_flow_bucket.bucket
+      }
+      log_destination_type = "S3"
+      log_type             = "FLOW"
+    }
+  }
+}
+
+###########################################
+# Per-spoke VPC firewalls (standalone mode)
+###########################################
+
+resource "aws_networkfirewall_firewall" "spoke_vpc_fw" {
+  for_each            = local.spoke_vpcs
+  name                = "NetworkFirewall-${each.key}"
+  firewall_policy_arn = aws_networkfirewall_firewall_policy.fw_policy.arn
+  vpc_id              = module.vpc[each.key].vpc_id
+
+  dynamic "subnet_mapping" {
+    for_each = slice(module.vpc[each.key].protected_subnets, 0, min(2, length(module.vpc[each.key].protected_subnets)))
+    content {
+      subnet_id = subnet_mapping.value
+    }
+  }
+
+  depends_on = [module.vpc]
+}
+
+resource "aws_networkfirewall_logging_configuration" "spoke_fw_logging" {
+  for_each     = local.spoke_vpcs
+  firewall_arn = aws_networkfirewall_firewall.spoke_vpc_fw[each.key].arn
   logging_configuration {
     log_destination_config {
       log_destination = {

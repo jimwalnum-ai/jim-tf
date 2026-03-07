@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cilium Security — {{ cluster }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="container header-inner">
+      <div class="logo">
+        <div class="logo-icon">&#x1f6e1;</div>
+        <h1>Cilium Security <span>Dashboard</span></h1>
+      </div>
+      <div class="cluster-badge">{{ cluster }}</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Agent Runs</div>
+        <div class="value">{{ stats.total_runs }}</div>
+      </div>
+      <div class="stat-card clean">
+        <div class="label">Clean Runs</div>
+        <div class="value">{{ stats.clean_runs }}</div>
+      </div>
+      <div class="stat-card critical">
+        <div class="label">Critical</div>
+        <div class="value">{{ stats.severity_counts.CRITICAL }}</div>
+      </div>
+      <div class="stat-card high">
+        <div class="label">High</div>
+        <div class="value">{{ stats.severity_counts.HIGH }}</div>
+      </div>
+      <div class="stat-card medium">
+        <div class="label">Medium</div>
+        <div class="value">{{ stats.severity_counts.MEDIUM }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Flows Analyzed</div>
+        <div class="value">{{ "{:,}".format(stats.total_flows) }}</div>
+      </div>
+    </div>
+
+    <!-- Recent Incidents -->
+    {% if stats.recent_incidents %}
+    <div class="section-header">
+      <h2>Recent Incidents</h2>
+    </div>
+    <div class="incidents-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Incident</th>
+            <th>Type</th>
+            <th>Affected Workloads</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inc in stats.recent_incidents %}
+          <tr>
+            <td><span class="badge badge-{{ inc.severity | lower }}">{{ inc.severity }}</span></td>
+            <td>
+              <div class="incident-title">{{ inc.title }}</div>
+              <div class="incident-desc">{{ inc.description | truncate(120) }}</div>
+            </td>
+            <td>{{ inc.threat_type or '—' }}</td>
+            <td>
+              <div class="workloads">
+                {% for w in inc.affected_workloads[:3] %}
+                <span class="workload-tag">{{ w }}</span>
+                {% endfor %}
+                {% if inc.affected_workloads | length > 3 %}
+                <span class="workload-tag">+{{ inc.affected_workloads | length - 3 }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td style="white-space: nowrap; font-size: 13px; color: var(--text-muted);">{{ inc.report_timestamp[:16] | replace('T', ' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Reports Timeline -->
+    <div class="section-header">
+      <h2>Agent Run History</h2>
+      <div class="filter-pills">
+        <a href="/?days=1" {% if days == 1 %}class="active"{% endif %}>24h</a>
+        <a href="/?days=3" {% if days == 3 %}class="active"{% endif %}>3d</a>
+        <a href="/?days=7" {% if days == 7 %}class="active"{% endif %}>7d</a>
+        <a href="/?days=14" {% if days == 14 %}class="active"{% endif %}>14d</a>
+        <a href="/?days=30" {% if days == 30 %}class="active"{% endif %}>30d</a>
+      </div>
+    </div>
+
+    {% if report_metas %}
+    <div class="reports-list">
+      {% for meta in report_metas %}
+      <a class="report-row" href="/report?key={{ meta.key | urlencode }}">
+        <span class="report-time">{{ meta.last_modified[:19] | replace('T', ' ') }}</span>
+        <span class="report-summary">{{ meta.filename }}</span>
+        <span class="report-flows">{{ meta.size | filesizeformat }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">&#x1f50d;</div>
+      <p>No reports found for the last {{ days }} day{{ 's' if days != 1 }}.</p>
+      <p style="margin-top: 8px;">The security agent runs every 15 minutes — reports will appear here once it completes its first run.</p>
+    </div>
+    {% endif %}
+  </main>
+</body>
+</html>
