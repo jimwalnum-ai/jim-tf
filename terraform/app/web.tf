@@ -15,9 +15,14 @@ resource "terraform_data" "flask_app_image" {
     interpreter = ["bash", "-c"]
     command     = <<-EOT
       set -e
-      aws ecr get-login-password --region ${data.aws_region.current.id} \
-        | docker login --username AWS --password-stdin ${aws_ecr_repository.flask_app.repository_url}
-      docker buildx build --platform linux/arm64 \
+      DOCKER_CFG=$(mktemp -d)
+      trap 'rm -rf "$DOCKER_CFG"' EXIT
+      TOKEN=$(aws ecr get-login-password --region ${data.aws_region.current.id})
+      AUTH=$(printf 'AWS:%s' "$TOKEN" | base64)
+      printf '{"auths":{"%s":{"auth":"%s"}}}' \
+        "${aws_ecr_repository.flask_app.repository_url}" "$AUTH" \
+        > "$DOCKER_CFG/config.json"
+      docker --config "$DOCKER_CFG" buildx build --platform linux/arm64 \
         -t ${aws_ecr_repository.flask_app.repository_url}:latest \
         --push .
     EOT

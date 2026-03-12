@@ -5,7 +5,7 @@
 module "hubble_logs_bucket" {
   source = "../modules/s3"
 
-  bucket_name     = "${local.prefix}-hubble-flow-logs"
+  bucket_name     = "${local.prefix}-usw2-hubble-flow-logs"
   life_cycle_term = "short-term"
   tags            = local.tags
 }
@@ -97,7 +97,7 @@ resource "helm_release" "fluent_bit" {
   chart      = "fluent-bit"
   namespace  = local.fluent_bit_namespace
 
-  wait    = true
+  wait    = false
   timeout = 600
 
   values = [<<-YAML
@@ -113,9 +113,6 @@ resource "helm_release" "fluent_bit" {
             Flush         5
             Log_Level     info
             Daemon        off
-            HTTP_Server   On
-            HTTP_Listen   0.0.0.0
-            HTTP_Port     2020
             Parsers_File  /fluent-bit/etc/parsers.conf
 
       inputs: |

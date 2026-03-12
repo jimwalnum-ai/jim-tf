@@ -1,0 +1,39 @@
+################################################################################
+# Container images are replicated from us-east-1 via ECR replication (global/).
+# No local docker build is needed.
+#
+# To force a manual push to the west ECR (e.g. during initial bootstrap before
+# replication has run), uncomment the terraform_data block below.
+################################################################################
+
+# locals {
+#   web_src_dir = "${path.module}/../web"
+#   web_src_hash = sha256(join("", [
+#     filesha256("${local.web_src_dir}/Dockerfile"),
+#     filesha256("${local.web_src_dir}/server.py"),
+#     filesha256("${local.web_src_dir}/index.html"),
+#   ]))
+# }
+#
+# resource "terraform_data" "flask_app_image" {
+#   triggers_replace = [local.web_src_hash]
+#
+#   provisioner "local-exec" {
+#     working_dir = local.web_src_dir
+#     interpreter = ["bash", "-c"]
+#     command     = <<-EOT
+#       set -e
+#       aws ecr get-login-password --region us-west-2 \
+#         | docker login --username AWS --password-stdin ${aws_ecr_repository.flask_app.repository_url}
+#       docker buildx build --platform linux/arm64 \
+#         -t ${aws_ecr_repository.flask_app.repository_url}:latest \
+#         --push .
+#     EOT
+#   }
+# }
+
+variable "web_db_name" {
+  type        = string
+  description = "Database name for the web service."
+  default     = "factors"
+}

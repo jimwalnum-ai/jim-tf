@@ -132,9 +132,6 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
         labels = {
           app = "cilium-security-dashboard"
         }
-        annotations = {
-          "src-hash" = local.dashboard_src_hash
-        }
       }
 
       spec {
@@ -142,7 +139,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
 
         container {
           name              = "dashboard"
-          image             = "${aws_ecr_repository.security_dashboard.repository_url}:latest"
+          image             = "${data.terraform_remote_state.app_east.outputs.security_dashboard_ecr_url}:latest"
           image_pull_policy = "Always"
 
           port {
@@ -233,55 +230,17 @@ resource "kubernetes_service_v1" "security_dashboard" {
 }
 
 ################################################################################
-# Build & Push Dashboard Image
-################################################################################
-
-locals {
-  dashboard_src_dir = "${path.module}/../security-dashboard"
-  dashboard_src_hash = sha256(join("", [
-    filesha256("${local.dashboard_src_dir}/Dockerfile"),
-    filesha256("${local.dashboard_src_dir}/app.py"),
-    filesha256("${local.dashboard_src_dir}/requirements.txt"),
-    filesha256("${local.dashboard_src_dir}/static/style.css"),
-    filesha256("${local.dashboard_src_dir}/templates/index.html"),
-    filesha256("${local.dashboard_src_dir}/templates/report.html"),
-  ]))
-}
-
-resource "terraform_data" "security_dashboard_image" {
-  triggers_replace = [local.dashboard_src_hash]
-
-  provisioner "local-exec" {
-    working_dir = local.dashboard_src_dir
-    interpreter = ["bash", "-c"]
-    command     = <<-EOT
-      set -e
-      export DOCKER_CONFIG=$(mktemp -d)
-      trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-      TOKEN=$(aws ecr get-login-password --region ${data.aws_region.current.id})
-      AUTH=$(printf 'AWS:%s' "$TOKEN" | base64)
-      printf '{"auths":{"%s":{"auth":"%s"}}}' \
-        "${aws_ecr_repository.security_dashboard.repository_url}" "$AUTH" \
-        > "$DOCKER_CONFIG/config.json"
-      docker buildx build --platform linux/arm64 \
-        -t ${aws_ecr_repository.security_dashboard.repository_url}:latest \
-        --push .
-    EOT
-  }
-}
-
-################################################################################
-# Outputs
+# Build & Push (omitted — images replicated from us-east-1 via ECR replication)
 ################################################################################
 
 output "security_dashboard_ecr_url" {
   value       = aws_ecr_repository.security_dashboard.repository_url
-  description = "ECR repository URL for the security dashboard image"
+  description = "ECR repository URL for the security dashboard image (us-west-2)"
 }
 
 output "security_dashboard_url" {
   value       = try("http://${kubernetes_service_v1.security_dashboard.status[0].load_balancer[0].ingress[0].hostname}", "(pending)")
-  description = "URL to access the Cilium security dashboard"
+  description = "URL to access the Cilium security dashboard (us-west-2)"
 }
 
 output "security_dashboard_url_hostname" {

@@ -111,6 +111,7 @@ def index():
     return render_template(
         "index.html",
         cluster=CLUSTER_NAME,
+        region=AWS_REGION,
         stats=stats,
         report_metas=report_metas[:100],
         days=days,
@@ -123,7 +124,7 @@ def report_detail():
     if not key or not key.startswith(REPORTS_PREFIX):
         abort(400)
     report = get_report(key)
-    return render_template("report.html", cluster=CLUSTER_NAME, report=report, key=key)
+    return render_template("report.html", cluster=CLUSTER_NAME, region=AWS_REGION, report=report, key=key)
 
 
 @app.route("/api/reports")
@@ -142,7 +143,7 @@ def api_report():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "region": AWS_REGION, "cluster": CLUSTER_NAME})
 
 
 if __name__ == "__main__":

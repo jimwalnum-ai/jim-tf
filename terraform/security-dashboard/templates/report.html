@@ -15,11 +15,24 @@
         <div class="logo-icon">&#x1f6e1;</div>
         <h1>Cilium Security <span>Dashboard</span></h1>
       </div>
-      <div class="cluster-badge">{{ cluster }}</div>
+      <div class="header-badges">
+        <div class="cluster-badge">{{ cluster }}</div>
+        <div class="region-badge" data-region="{{ region }}">{{ region }}</div>
+      </div>
     </div>
   </header>
 
   <main class="container">
+    <div class="region-banner" data-region="{{ region }}">
+      Served from <strong>{{ region }}</strong>
+      {% if region.startswith('us-east') %}
+        <span class="region-flag">US East (N. Virginia)</span>
+      {% elif region.startswith('us-west') %}
+        <span class="region-flag">US West (Oregon)</span>
+      {% else %}
+        <span class="region-flag">{{ region }}</span>
+      {% endif %}
+    </div>
     <a href="/" class="back-link">&larr; Back to dashboard</a>
 
     <div class="report-header">

@@ -89,6 +89,12 @@ header {
   font-weight: 400;
 }
 
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .cluster-badge {
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -96,6 +102,58 @@ header {
   padding: 6px 14px;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.region-badge {
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.region-badge[data-region^="us-east"] {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+}
+
+.region-badge[data-region^="us-west"] {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.region-banner {
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.region-banner[data-region^="us-east"] {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #93bbfd;
+}
+
+.region-banner[data-region^="us-west"] {
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  color: #d4b5fd;
+}
+
+.region-banner strong {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.region-flag {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.7;
 }
 
 /* ─── Stats Grid ────────────────────────────────────────────────────────── */

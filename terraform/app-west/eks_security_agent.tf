@@ -178,7 +178,7 @@ resource "kubernetes_cron_job_v1" "security_agent" {
 
             container {
               name              = "agent"
-              image             = "${aws_ecr_repository.security_agent.repository_url}:latest"
+              image             = "${data.terraform_remote_state.app_east.outputs.security_agent_ecr_url}:latest"
               image_pull_policy = "Always"
 
               env {
@@ -250,50 +250,15 @@ resource "kubernetes_service_account_v1" "security_agent" {
 }
 
 ################################################################################
-# Build & Push Agent Image
-################################################################################
-
-locals {
-  security_agent_src_dir = "${path.module}/../security-agent"
-  security_agent_src_hash = sha256(join("", [
-    filesha256("${local.security_agent_src_dir}/Dockerfile"),
-    filesha256("${local.security_agent_src_dir}/agent.py"),
-    filesha256("${local.security_agent_src_dir}/requirements.txt"),
-  ]))
-}
-
-resource "terraform_data" "security_agent_image" {
-  triggers_replace = [local.security_agent_src_hash]
-
-  provisioner "local-exec" {
-    working_dir = local.security_agent_src_dir
-    interpreter = ["bash", "-c"]
-    command     = <<-EOT
-      set -e
-      DOCKER_CFG=$(mktemp -d)
-      trap 'rm -rf "$DOCKER_CFG"' EXIT
-      TOKEN=$(aws ecr get-login-password --region ${data.aws_region.current.id})
-      AUTH=$(printf 'AWS:%s' "$TOKEN" | base64)
-      printf '{"auths":{"%s":{"auth":"%s"}}}' \
-        "${aws_ecr_repository.security_agent.repository_url}" "$AUTH" \
-        > "$DOCKER_CFG/config.json"
-      docker --config "$DOCKER_CFG" buildx build --platform linux/arm64 \
-        -t ${aws_ecr_repository.security_agent.repository_url}:latest \
-        --push .
-    EOT
-  }
-}
-
-################################################################################
-# Outputs
+# Build & Push Agent Image (omitted — images replicated from us-east-1 via ECR replication)
 ################################################################################
 
 output "security_agent_ecr_url" {
   value       = aws_ecr_repository.security_agent.repository_url
-  description = "ECR repository URL for the Cilium security agent image"
+  description = "ECR repository URL for the Cilium security agent image (us-west-2)"
 }
 
 output "security_alerts_topic_arn" {
   value       = aws_sns_topic.security_alerts.arn
-  description = "SNS topic ARN for Cilium security alerts"
+  description = "SNS topic ARN for Cilium security alerts (us-west-2)"
 }

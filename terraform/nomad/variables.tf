@@ -6,7 +6,7 @@ variable "env" {
 variable "server_count" {
   description = "Number of Nomad/Consul server nodes (use 3 or 5 for HA)."
   type        = number
-  default     = 3
+  default     = 1
 }
 
 variable "server_instance_type" {

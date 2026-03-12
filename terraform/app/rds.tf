@@ -22,7 +22,8 @@ resource "random_password" "master_password" {
 }
 
 resource "aws_secretsmanager_secret" "cs_rds_credentials" {
-  name = "cs-factor-credentials"
+  name                    = "cs-factor-credentials"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "cs_rds_credentials" {
@@ -80,8 +81,11 @@ resource "aws_db_instance" "factor" {
   db_subnet_group_name   = aws_db_subnet_group.factor.name
   vpc_security_group_ids = [aws_security_group.vpc_only.id]
   parameter_group_name   = aws_db_parameter_group.factor.name
-  publicly_accessible    = false
-  skip_final_snapshot    = true
+  publicly_accessible      = false
+  skip_final_snapshot      = true
+  backup_retention_period  = 7
+  backup_window            = "03:00-04:00"
+  maintenance_window       = "sun:04:30-sun:05:30"
 }
 
 resource "aws_db_parameter_group" "factor" {
@@ -92,4 +96,34 @@ resource "aws_db_parameter_group" "factor" {
     name  = "log_connections"
     value = "1"
   }
+}
+
+################################################################################
+# Outputs for cross-region references (app-west, global)
+################################################################################
+
+output "rds_instance_arn" {
+  value       = aws_db_instance.factor.arn
+  description = "ARN of the primary RDS instance (used by cross-region read replica)"
+}
+
+output "rds_username" {
+  value       = aws_db_instance.factor.username
+  description = "Master username for the primary RDS instance"
+}
+
+output "rds_password" {
+  value       = random_password.master_password.result
+  sensitive   = true
+  description = "Master password for the primary RDS instance"
+}
+
+output "rds_host" {
+  value       = aws_db_instance.factor.address
+  description = "Hostname of the primary RDS instance"
+}
+
+output "rds_port" {
+  value       = aws_db_instance.factor.port
+  description = "Port of the primary RDS instance"
 }

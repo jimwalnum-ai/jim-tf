@@ -2,7 +2,7 @@ import json
 import os
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
-from socketserver import TCPServer
+from socketserver import ThreadingTCPServer
 from urllib.parse import parse_qs, urlparse
 
 import psycopg2
@@ -94,7 +94,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.wfile.write(body)
+        except BrokenPipeError:
+            pass
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -142,9 +145,10 @@ def main():
     server_address = ("", port)
     directory = os.path.dirname(os.path.abspath(__file__))
     handler = lambda *args, **kwargs: Handler(*args, directory=directory, **kwargs)
-    TCPServer.allow_reuse_address = True
+    ThreadingTCPServer.allow_reuse_address = True
+    ThreadingTCPServer.daemon_threads = True
     _ensure_table()
-    with TCPServer(server_address, handler) as httpd:
+    with ThreadingTCPServer(server_address, handler) as httpd:
         print(f"Serving on http://localhost:{port}")
         httpd.serve_forever()
 
