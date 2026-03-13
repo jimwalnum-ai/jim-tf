@@ -36,55 +36,53 @@ def _ensure_table():
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_factors_scheme
+                    ON factors ((data->>'scheme'))
+                """
+            )
         conn.close()
     except Exception as exc:
         print(f"Warning: could not ensure factors table exists: {exc}")
 
 
-def _collect_metrics(rows):
-    """Extract timing metrics from each row's data dict."""
-    sent_to_persist = []
-    pull_to_persist = []
-    queue_to_db = []
-    factor_time = []
-    for record in rows:
-        if record is None:
-            continue
-        if isinstance(record, str):
-            try:
-                record = json.loads(record)
-            except json.JSONDecodeError:
-                continue
-        if not isinstance(record, dict):
-            continue
-        for key, dest in [
-            ("sent_to_persist_ms", sent_to_persist),
-            ("pull_to_persist_ms", pull_to_persist),
-            ("queue_to_db_ms", queue_to_db),
-            ("factor_time_ms", factor_time),
-        ]:
-            val = record.get(key)
-            if val is not None:
-                try:
-                    dest.append(float(val))
-                except (TypeError, ValueError):
-                    continue
-    return sent_to_persist, pull_to_persist, queue_to_db, factor_time
+_METRIC_KEYS = ["sent_to_persist_ms", "pull_to_persist_ms", "queue_to_db_ms", "factor_time_ms"]
+_METRIC_LABELS = ["sent_to_persist", "pull_to_persist", "queue_to_db", "factor_time"]
 
 
-def _stats(values):
-    if not values:
-        return {"count": 0, "avg": None, "stddev": None, "min": None, "max": None}
-    count = len(values)
-    avg = sum(values) / count
-    variance = sum((v - avg) ** 2 for v in values) / count
-    return {
-        "count": count,
-        "avg": round(avg, 2),
-        "stddev": round(variance ** 0.5, 2),
-        "min": round(min(values), 2),
-        "max": round(max(values), 2),
-    }
+def _build_agg_sql(where_clause=""):
+    """Build a SQL query that computes count/avg/stddev/min/max per metric key."""
+    agg_cols = []
+    for key in _METRIC_KEYS:
+        cast = f"(data->>'{key}')::double precision"
+        agg_cols.extend([
+            f"COUNT({cast}) AS \"{key}_count\"",
+            f"AVG({cast}) AS \"{key}_avg\"",
+            f"STDDEV_POP({cast}) AS \"{key}_stddev\"",
+            f"MIN({cast}) AS \"{key}_min\"",
+            f"MAX({cast}) AS \"{key}_max\"",
+        ])
+    sql = f"SELECT {', '.join(agg_cols)} FROM factors"
+    if where_clause:
+        sql += f" WHERE {where_clause}"
+    return sql
+
+
+def _row_to_stats(row):
+    """Convert a single aggregation result row into per-metric stat dicts."""
+    result = {}
+    for i, label in enumerate(_METRIC_LABELS):
+        offset = i * 5
+        count = row[offset] or 0
+        result[label] = {
+            "count": count,
+            "avg": round(row[offset + 1], 2) if row[offset + 1] is not None else None,
+            "stddev": round(row[offset + 2], 2) if row[offset + 2] is not None else None,
+            "min": round(row[offset + 3], 2) if row[offset + 3] is not None else None,
+            "max": round(row[offset + 4], 2) if row[offset + 4] is not None else None,
+        }
+    return result
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -123,17 +121,17 @@ class Handler(SimpleHTTPRequestHandler):
             with _db_conn() as conn:
                 with conn.cursor() as cur:
                     if scheme_value is None or scheme_value == "":
-                        cur.execute("SELECT data FROM factors")
+                        cur.execute(_build_agg_sql())
                     else:
-                        cur.execute("SELECT data FROM factors WHERE (data->>'scheme')::text = %s", (scheme_value,))
-                    rows = [row[0] for row in cur.fetchall()]
-            sent, pull, queue, factor_time = _collect_metrics(rows)
+                        cur.execute(
+                            _build_agg_sql("(data->>'scheme')::text = %s"),
+                            (scheme_value,),
+                        )
+                    row = cur.fetchone()
+            stats = _row_to_stats(row)
             self._json_response({
                 "scheme": scheme_value,
-                "sent_to_persist": _stats(sent),
-                "pull_to_persist": _stats(pull),
-                "queue_to_db": _stats(queue),
-                "factor_time": _stats(factor_time),
+                **stats,
             })
             return
 

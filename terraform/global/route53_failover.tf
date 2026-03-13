@@ -166,9 +166,14 @@ resource "aws_route53_record" "dashboard_west" {
 # realhandsonlabs.net — Flask App Latency-Based Routing
 ################################################################################
 
+data "aws_route53_zone" "lab" {
+  name         = "${data.aws_caller_identity.current.account_id}.realhandsonlabs.net."
+  private_zone = false
+}
+
 locals {
-  lab_zone_id = "Z08304433IU9I8FNPC7CC"
-  lab_domain  = "975050012121.realhandsonlabs.net"
+  lab_zone_id = data.aws_route53_zone.lab.zone_id
+  lab_domain  = "${data.aws_caller_identity.current.account_id}.realhandsonlabs.net"
 }
 
 resource "aws_route53_record" "lab_app_east" {

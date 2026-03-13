@@ -1,1 +1,1 @@
-../foundation/shared_vars.tf
+../bootstrap/shared_vars.tf
