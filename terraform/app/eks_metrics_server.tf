@@ -7,6 +7,8 @@ resource "helm_release" "metrics_server" {
 
   set = [
     { name = "args[0]", value = "--kubelet-preferred-address-types=InternalIP" },
+    { name = "hostNetwork.enabled", value = "true" },
+    { name = "containerPort", value = "4443" },
   ]
 
   depends_on = [module.eks_node_group]

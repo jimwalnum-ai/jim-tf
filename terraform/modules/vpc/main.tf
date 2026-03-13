@@ -9,7 +9,7 @@ locals {
   flow_log_bucket_name = "vpc-${var.name}-${var.env}-flow-logs"
   tag_name             = lookup(aws_vpc.vpc.tags, "Name")
   requested_azs_count  = max(var.private_subnets_count, var.public_subnets_count)
-  default_azs          = sort(data.aws_availability_zones.available.names)
+  default_azs          = sort([for az in data.aws_availability_zones.available.names : az if length(az) == 10])
   azs_source           = length(var.availability_zones) > 0 ? var.availability_zones : local.default_azs
   azs                  = slice(local.azs_source, 0, local.requested_azs_count)
   endpoint_subnet_ids  = length(var.endpoint_subnet_ids) > 0 ? var.endpoint_subnet_ids : aws_subnet.tgw_subnets[*].id

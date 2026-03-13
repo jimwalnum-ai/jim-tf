@@ -10,7 +10,7 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  available_azs = sort(data.aws_availability_zones.available.names)
+  available_azs = sort([for az in data.aws_availability_zones.available.names : az if length(az) == 10])
 }
 
 module "core-kms-key" {
