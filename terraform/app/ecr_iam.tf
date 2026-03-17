@@ -1,8 +1,9 @@
 locals {
   ecr_repos = {
-    flask_app          = aws_ecr_repository.flask_app
-    security_agent     = aws_ecr_repository.security_agent
-    security_dashboard = aws_ecr_repository.security_dashboard
+    flask_app               = aws_ecr_repository.flask_app
+    security_agent          = aws_ecr_repository.security_agent
+    security_dashboard      = aws_ecr_repository.security_dashboard
+    observability_dashboard = aws_ecr_repository.observability_dashboard
   }
 }
 

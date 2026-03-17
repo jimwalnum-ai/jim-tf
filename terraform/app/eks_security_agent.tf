@@ -277,9 +277,16 @@ resource "terraform_data" "security_agent_image" {
       printf '{"auths":{"%s":{"auth":"%s"}}}' \
         "${aws_ecr_repository.security_agent.repository_url}" "$AUTH" \
         > "$DOCKER_CFG/config.json"
-      docker --config "$DOCKER_CFG" buildx build --platform linux/arm64 \
-        -t ${aws_ecr_repository.security_agent.repository_url}:latest \
-        --push .
+      for attempt in 1 2 3; do
+        if docker --config "$DOCKER_CFG" buildx build --platform linux/arm64 \
+          -t ${aws_ecr_repository.security_agent.repository_url}:latest \
+          --push .; then
+          exit 0
+        fi
+        echo "Build attempt $attempt failed; retrying in 15s..." >&2
+        sleep 15
+      done
+      exit 1
     EOT
   }
 }

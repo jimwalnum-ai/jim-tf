@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Observability — {{ data.cluster }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta http-equiv="refresh" content="10">
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1>Infrastructure Observability</h1>
+      <span class="subtitle">{{ data.cluster }} &middot; {{ data.region }}</span>
+    </div>
+    <div class="header-right">
+      <span class="status-badge status-{{ data.overall_status }}">{{ data.overall_status | upper }}</span>
+      <span class="timestamp" id="header-ts" data-utc="{{ data.timestamp }}">{{ data.timestamp[:19] }}Z</span>
+      <button onclick="location.href='/api/refresh'" class="btn-refresh">Refresh</button>
+    </div>
+  </header>
+
+  <!-- Summary Cards -->
+  <section class="cards">
+    <div class="card card-clickable {{ 'card-error' if data.critical_count > 0 else ('card-warn' if data.high_count > 0 else 'card-ok') }}" data-filter="all">
+      <div class="card-value">{{ data.problem_count }}</div>
+      <div class="card-label">Total Issues</div>
+    </div>
+    <div class="card card-clickable {{ 'card-error' if data.critical_count > 0 else 'card-ok' }}" data-filter="CRITICAL">
+      <div class="card-value">{{ data.critical_count }}</div>
+      <div class="card-label">Critical</div>
+    </div>
+    <div class="card card-clickable {{ 'card-warn' if data.high_count > 0 else 'card-ok' }}" data-filter="HIGH">
+      <div class="card-value">{{ data.high_count }}</div>
+      <div class="card-label">High</div>
+    </div>
+    <div class="card card-clickable card-ok" data-filter="source:kubernetes">
+      <div class="card-value">{{ data.kubernetes.summary.pods_healthy }}</div>
+      <div class="card-label">Healthy Pods</div>
+    </div>
+    <div class="card card-clickable {{ 'card-error' if data.kubernetes.summary.nodes_not_ready > 0 else 'card-ok' }}" data-filter="source:kubernetes">
+      <div class="card-value">{{ data.kubernetes.summary.nodes_ready }}/{{ data.kubernetes.summary.nodes_total }}</div>
+      <div class="card-label">Nodes Ready</div>
+    </div>
+    <div class="card card-clickable {{ 'card-ok' if data.nomad.summary.reachable else 'card-error' }}" data-filter="source:nomad">
+      <div class="card-value">{{ data.nomad.summary.jobs_running }}/{{ data.nomad.summary.jobs_total }}</div>
+      <div class="card-label">Nomad Jobs Running</div>
+    </div>
+    <div class="card card-clickable {{ 'card-warn' if data.nomad_logs.summary.tasks_with_anomalies > 0 else 'card-ok' }}" data-filter="source:nomad-logs">
+      <div class="card-value">{{ data.nomad_logs.summary.total_anomalies }}</div>
+      <div class="card-label">Log Anomalies</div>
+    </div>
+  </section>
+
+  <!-- Expandable detail drawer (populated by card clicks) -->
+  <section id="card-detail-drawer" class="panel card-drawer" style="display:none;">
+    <div class="drawer-header">
+      <h2 id="drawer-title">Issues</h2>
+      <button id="drawer-close" class="btn-refresh">&times; Close</button>
+    </div>
+    <table id="drawer-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Severity</th>
+          <th>Source</th>
+          <th>Component</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody id="drawer-body"></tbody>
+    </table>
+    <p id="drawer-empty" class="text-muted" style="display:none; padding:1rem 0;">No matching issues.</p>
+  </section>
+
+  <!-- Problems Table — rolling 30-minute window -->
+  {% set problems_30m = data.get('all_problems_30m', data.all_problems) %}
+  {% if problems_30m %}
+  <section class="panel">
+    <h2>Problems — Last 30 Minutes ({{ problems_30m | length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Severity</th>
+          <th>Source</th>
+          <th>Component</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in problems_30m %}
+        <tr class="row-{{ p.severity | lower }}">
+          <td class="mono timestamp-cell" data-utc="{{ p.timestamp }}">{{ p.timestamp[:19] }}Z</td>
+          <td><span class="sev sev-{{ p.severity | lower }}">{{ p.severity }}</span></td>
+          <td>{{ p.source }}</td>
+          <td class="mono">{{ p.component }}</td>
+          <td>{{ p.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <section class="panel panel-ok">
+    <h2>All Clear</h2>
+    <p>No problems detected across Kubernetes, Nomad, or AWS resources in the last 30 minutes.</p>
+  </section>
+  {% endif %}
+
+  <!-- Kubernetes Detail -->
+  <section class="panel">
+    <h2>Kubernetes</h2>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Pods</span>
+        <span class="detail-value">{{ data.kubernetes.summary.pods_healthy }} healthy / {{ data.kubernetes.summary.pods_total }} total
+          {% if data.kubernetes.summary.pods_unhealthy > 0 %}
+          <span class="badge-warn">{{ data.kubernetes.summary.pods_unhealthy }} unhealthy</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Deployments</span>
+        <span class="detail-value">{{ data.kubernetes.summary.deployments_healthy }} healthy / {{ data.kubernetes.summary.deployments_total }} total
+          {% if data.kubernetes.summary.deployments_unhealthy > 0 %}
+          <span class="badge-warn">{{ data.kubernetes.summary.deployments_unhealthy }} degraded</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Nodes</span>
+        <span class="detail-value">{{ data.kubernetes.summary.nodes_ready }} ready / {{ data.kubernetes.summary.nodes_total }} total</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Warning Events</span>
+        <span class="detail-value">{{ data.kubernetes.summary.warning_events }}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Nomad Detail -->
+  <section class="panel">
+    <h2>Nomad</h2>
+    {% if data.nomad.summary.reachable %}
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Status</span>
+        <span class="detail-value"><span class="badge-ok">Reachable</span></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Jobs</span>
+        <span class="detail-value">{{ data.nomad.summary.jobs_running }} running / {{ data.nomad.summary.jobs_total }} total
+          {% if data.nomad.summary.jobs_dead > 0 %}
+          <span class="badge-warn">{{ data.nomad.summary.jobs_dead }} dead</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Allocations</span>
+        <span class="detail-value">{{ data.nomad.summary.allocs_running }} running / {{ data.nomad.summary.allocs_total }} total
+          {% if data.nomad.summary.allocs_failed > 0 %}
+          <span class="badge-warn">{{ data.nomad.summary.allocs_failed }} failed</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted">Nomad is not reachable{% if not data.nomad.summary.reachable and not data.nomad.problems %} (NOMAD_ADDR not configured){% endif %}.</p>
+    {% endif %}
+  </section>
+
+  <!-- Nomad Log Anomaly Detection -->
+  <section class="panel">
+    <h2>Nomad Log Anomaly Detection</h2>
+    {% if data.nomad_logs.summary.tasks_scanned > 0 %}
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Tasks Scanned</span>
+        <span class="detail-value">{{ data.nomad_logs.summary.tasks_scanned }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Tasks with Anomalies</span>
+        <span class="detail-value">
+          {{ data.nomad_logs.summary.tasks_with_anomalies }}
+          {% if data.nomad_logs.summary.total_anomalies > 0 %}
+          <span class="badge-warn">{{ data.nomad_logs.summary.total_anomalies }} anomalies</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Baseline</span>
+        <span class="detail-value">
+          {% if data.nomad_logs.summary.baseline_learning %}
+          <span class="badge-info">Learning — collecting baseline</span>
+          {% else %}
+          <span class="badge-ok">Established</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    {% if data.nomad_logs.log_findings %}
+    <table class="mt-1">
+      <thead>
+        <tr>
+          <th>Job / Task</th>
+          <th>Alloc</th>
+          <th>Lines</th>
+          <th>Patterns</th>
+          <th>Anomalies</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in data.nomad_logs.log_findings %}
+        <tr class="{{ 'row-high' if f.anomaly_count >= 3 else 'row-medium' }}">
+          <td class="mono">{{ f.job }}/{{ f.task }}</td>
+          <td class="mono">{{ f.alloc_short }}</td>
+          <td>{{ f.line_count }}</td>
+          <td>{{ f.unique_patterns }}</td>
+          <td>
+            {% for a in f.anomalies %}
+            <div class="anomaly-item">
+              <span class="anomaly-type anomaly-{{ a.type }}">{{ a.type | replace("_", " ") }}</span>
+              {% if a.count > 1 %}<span class="anomaly-count">&times;{{ a.count }}</span>{% endif %}
+              <div class="log-line">{{ a.sample }}</div>
+            </div>
+            {% endfor %}
+            {% if f.learning %}
+            <div class="text-muted" style="font-size:0.75rem; margin-top:0.3rem;">Baseline still learning — anomalies shown for reference only</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted mt-1">No anomalies detected in running task logs.</p>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">No running Nomad tasks to scan{% if not data.nomad.summary.reachable %} (Nomad unreachable){% endif %}.</p>
+    {% endif %}
+  </section>
+
+  <!-- SQS Detail -->
+  {% if data.sqs.queues %}
+  <section class="panel">
+    <h2>SQS Queues</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Queue</th>
+          <th>Visible</th>
+          <th>In-Flight</th>
+          <th>Delayed</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in data.sqs.queues %}
+        <tr class="{{ 'row-high' if q.visible > 10000 else ('row-medium' if q.visible > 1000 else '') }}">
+          <td class="mono">{{ q.name }}</td>
+          <td>{{ "{:,}".format(q.visible) }}</td>
+          <td>{{ "{:,}".format(q.in_flight) }}</td>
+          <td>{{ "{:,}".format(q.delayed) }}</td>
+          <td>{{ "{:,}".format(q.total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <!-- RDS Detail -->
+  {% if data.rds.instances %}
+  <section class="panel">
+    <h2>RDS</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Instance</th>
+          <th>Status</th>
+          <th>Engine</th>
+          <th>Class</th>
+          <th>Storage</th>
+          <th>Multi-AZ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for db in data.rds.instances %}
+        <tr class="{{ 'row-critical' if db.status != 'available' else '' }}">
+          <td class="mono">{{ db.id }}</td>
+          <td><span class="badge-{{ 'ok' if db.status == 'available' else 'warn' }}">{{ db.status }}</span></td>
+          <td>{{ db.engine }}</td>
+          <td>{{ db.instance_class }}</td>
+          <td>{{ db.storage_gb }} GB</td>
+          <td>{{ "Yes" if db.multi_az else "No" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <!-- CloudWatch Alarms -->
+  {% if data.cloudwatch.alarms %}
+  <section class="panel">
+    <h2>CloudWatch Alarms</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Alarm</th>
+          <th>State</th>
+          <th>Metric</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in data.cloudwatch.alarms %}
+        <tr class="{{ 'row-high' if a.state == 'ALARM' else '' }}">
+          <td class="mono">{{ a.name }}</td>
+          <td><span class="sev sev-{{ 'critical' if a.state == 'ALARM' else 'low' }}">{{ a.state }}</span></td>
+          <td>{{ a.namespace }} / {{ a.metric }}</td>
+          <td>{{ a.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <footer>
+    <p>Auto-refreshes every 10s &middot; Background poll every {{ data.get('poll_interval', 10) }}s &middot; <a href="/api/status">JSON API</a></p>
+  </footer>
+
+  <script>
+  (function() {
+    function fmtTs(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      if (isNaN(d)) return iso;
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    var tsEl = document.getElementById('header-ts');
+    if (tsEl) {
+      var utc = tsEl.getAttribute('data-utc');
+      var d = new Date(utc);
+      if (!isNaN(d)) {
+        tsEl.textContent = d.toLocaleString();
+      }
+    }
+
+    document.querySelectorAll('.timestamp-cell').forEach(function(el) {
+      var utc = el.getAttribute('data-utc');
+      if (utc) el.textContent = fmtTs(utc);
+    });
+
+    var problems = {{ data.get('all_problems_30m', data.all_problems) | tojson }};
+    var drawer = document.getElementById('card-detail-drawer');
+    var drawerBody = document.getElementById('drawer-body');
+    var drawerTitle = document.getElementById('drawer-title');
+    var drawerTable = document.getElementById('drawer-table');
+    var drawerEmpty = document.getElementById('drawer-empty');
+    var activeCard = null;
+
+    function sevClass(sev) {
+      return 'sev sev-' + sev.toLowerCase();
+    }
+
+    function rowClass(sev) {
+      return 'row-' + sev.toLowerCase();
+    }
+
+    function escHtml(s) {
+      var d = document.createElement('div');
+      d.appendChild(document.createTextNode(s));
+      return d.innerHTML;
+    }
+
+    function filterProblems(filterKey) {
+      if (filterKey === 'all') return problems;
+      if (filterKey.indexOf('source:') === 0) {
+        var src = filterKey.slice(7);
+        return problems.filter(function(p) { return p.source === src; });
+      }
+      return problems.filter(function(p) { return p.severity === filterKey; });
+    }
+
+    function titleForFilter(filterKey) {
+      if (filterKey === 'all') return 'All Issues — Last 30 min (' + problems.length + ')';
+      if (filterKey.indexOf('source:') === 0) {
+        var src = filterKey.slice(7);
+        var count = filterProblems(filterKey).length;
+        return src.charAt(0).toUpperCase() + src.slice(1) + ' Issues — Last 30 min (' + count + ')';
+      }
+      var count = filterProblems(filterKey).length;
+      return filterKey.charAt(0) + filterKey.slice(1).toLowerCase() + ' Issues — Last 30 min (' + count + ')';
+    }
+
+    function renderDrawer(items) {
+      drawerBody.innerHTML = '';
+      if (items.length === 0) {
+        drawerTable.style.display = 'none';
+        drawerEmpty.style.display = 'block';
+        return;
+      }
+      drawerTable.style.display = '';
+      drawerEmpty.style.display = 'none';
+      for (var i = 0; i < items.length; i++) {
+        var p = items[i];
+        var tr = document.createElement('tr');
+        tr.className = rowClass(p.severity);
+        tr.innerHTML =
+          '<td class="mono">' + escHtml(fmtTs(p.timestamp || '')) + '</td>' +
+          '<td><span class="' + sevClass(p.severity) + '">' + escHtml(p.severity) + '</span></td>' +
+          '<td>' + escHtml(p.source) + '</td>' +
+          '<td class="mono">' + escHtml(p.component) + '</td>' +
+          '<td>' + escHtml(p.message) + '</td>';
+        drawerBody.appendChild(tr);
+      }
+    }
+
+    function openDrawer(card, filterKey) {
+      var items = filterProblems(filterKey);
+      drawerTitle.textContent = titleForFilter(filterKey);
+      renderDrawer(items);
+      drawer.style.display = '';
+      requestAnimationFrame(function() {
+        drawer.classList.add('drawer-open');
+      });
+      if (activeCard) activeCard.classList.remove('card-active');
+      card.classList.add('card-active');
+      activeCard = card;
+      drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeDrawer() {
+      drawer.classList.remove('drawer-open');
+      setTimeout(function() { drawer.style.display = 'none'; }, 200);
+      if (activeCard) activeCard.classList.remove('card-active');
+      activeCard = null;
+    }
+
+    var cards = document.querySelectorAll('.card-clickable');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].addEventListener('click', function() {
+        var filter = this.getAttribute('data-filter');
+        if (activeCard === this) {
+          closeDrawer();
+        } else {
+          openDrawer(this, filter);
+        }
+      });
+    }
+
+    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+  })();
+  </script>
+</body>
+</html>

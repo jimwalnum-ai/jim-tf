@@ -202,6 +202,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
   depends_on = [
     kubernetes_service_account_v1.security_dashboard,
     aws_iam_role_policy_attachment.security_dashboard,
+    terraform_data.security_dashboard_image,
   ]
 }
 
@@ -263,9 +264,16 @@ resource "terraform_data" "security_dashboard_image" {
       printf '{"auths":{"%s":{"auth":"%s"}}}' \
         "${aws_ecr_repository.security_dashboard.repository_url}" "$AUTH" \
         > "$DOCKER_CONFIG/config.json"
-      docker buildx build --platform linux/arm64 \
-        -t ${aws_ecr_repository.security_dashboard.repository_url}:latest \
-        --push .
+      for attempt in 1 2 3; do
+        if docker buildx build --platform linux/arm64 \
+          -t ${aws_ecr_repository.security_dashboard.repository_url}:latest \
+          --push .; then
+          exit 0
+        fi
+        echo "Build attempt $attempt failed; retrying in 15s..." >&2
+        sleep 15
+      done
+      exit 1
     EOT
   }
 }
