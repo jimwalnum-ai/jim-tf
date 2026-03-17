@@ -16,15 +16,14 @@ def _resolve_queue_url(queue_name_or_url):
 
 queue_url = _resolve_queue_url(QUEUE_NAME)
 
-MESSAGES_MIN = 1000
-MESSAGES_MAX = 1200
-INTERVAL_SECONDS = 60
-SCHEME_ROTATION_SECONDS = 600
+INITIAL_MESSAGES = 200000
+TOPUP_MESSAGES = 100000
+TOPUP_INTERVAL_SECONDS = 180
+TOTAL_LIMIT = 700000
 SCHEME_MIN = 400000
 SCHEME_MAX = 500000000
 BATCH_SIZE = 10
-MAX_WORKERS = 8
-BATCH_DELAY_SECONDS = 0.25
+MAX_WORKERS = 40
 
 def _pick_scheme():
     return random.randint(SCHEME_MIN, SCHEME_MAX)
@@ -49,35 +48,38 @@ def _send_batch(entries):
     if failed:
         logger.error("failed_to_send=%s details=%s", len(failed), failed)
         raise RuntimeError(f"Failed to send {len(failed)} messages: {failed}")
-    logger.info("sent_messages=%s", len(response.get('Successful', [])))
+    logger.debug("sent_messages=%s", len(response.get('Successful', [])))
     return response
 
-while True:
+def _send_messages(count, scheme, offset=0):
+    logger.info("sending count=%s scheme=%s offset=%s", count, scheme, offset)
+    futures = []
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for start in range(0, count, BATCH_SIZE):
+            if start % 10000 == 0:
+                logger.info("batch_start=%s", offset + start)
+            batch_count = min(BATCH_SIZE, count - start)
+            entries = _build_entries(offset + start, batch_count, scheme)
+            futures.append(executor.submit(_send_batch, entries))
+    for future in as_completed(futures):
+        future.result()
+    logger.info("send_complete count=%s total_sent=%s", count, offset + count)
+
+scheme = _pick_scheme()
+logger.info("scheme=%s initial=%s topup=%s limit=%s", scheme, INITIAL_MESSAGES, TOPUP_MESSAGES, TOTAL_LIMIT)
+
+total_sent = 0
+
+_send_messages(INITIAL_MESSAGES, scheme, total_sent)
+total_sent += INITIAL_MESSAGES
+
+while total_sent < TOTAL_LIMIT:
+    logger.info("sleeping %ss before next top-up, total_sent=%s", TOPUP_INTERVAL_SECONDS, total_sent)
+    time.sleep(TOPUP_INTERVAL_SECONDS)
     scheme = _pick_scheme()
-    scheme_start = time.monotonic()
-    logger.info("new_scheme=%s rotation_seconds=%s", scheme, SCHEME_ROTATION_SECONDS)
+    remaining = TOTAL_LIMIT - total_sent
+    batch = min(TOPUP_MESSAGES, remaining)
+    _send_messages(batch, scheme, total_sent)
+    total_sent += batch
 
-    while time.monotonic() - scheme_start < SCHEME_ROTATION_SECONDS:
-        target_messages = random.randint(MESSAGES_MIN, MESSAGES_MAX)
-        logger.info("scheme=%s target_messages=%s", scheme, target_messages)
-        futures = []
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            for start in range(0, target_messages, BATCH_SIZE):
-                if start % 100 == 0:
-                    logger.info("batch_start=%s", start)
-                count = min(BATCH_SIZE, target_messages - start)
-                entries = _build_entries(start, count, scheme)
-                futures.append(executor.submit(_send_batch, entries))
-                time.sleep(BATCH_DELAY_SECONDS)
-
-        last_message_id = None
-        for future in as_completed(futures):
-            response = future.result()
-            successful = response.get('Successful', [])
-            if successful:
-                last_message_id = successful[-1].get('MessageId')
-
-        if last_message_id:
-            logger.info("last_message_id=%s", last_message_id)
-
-        time.sleep(INTERVAL_SECONDS)
+logger.info("done total_sent=%s", total_sent)

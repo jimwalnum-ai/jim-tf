@@ -72,6 +72,14 @@
         <div class="row"><span class="label">Min (ms)</span><span class="value" id="factor-min">-</span></div>
         <div class="row"><span class="label">Max (ms)</span><span class="value" id="factor-max">-</span></div>
       </div>
+      <div class="card" id="card-throughput">
+        <h2>Throughput (msg/sec)</h2>
+        <div class="row"><span class="label">Last 1 min</span><span class="value" id="tp-60">-</span></div>
+        <div class="row"><span class="label">Last 5 min</span><span class="value" id="tp-300">-</span></div>
+        <div class="row"><span class="label">Last 60 min</span><span class="value" id="tp-3600">-</span></div>
+        <div class="row"><span class="label">Overall</span><span class="value" id="tp-overall">-</span></div>
+        <div class="row"><span class="label">Total messages</span><span class="value" id="tp-total">-</span></div>
+      </div>
     </div>
 
     <script>
@@ -93,6 +101,15 @@
         document.getElementById(`${prefix}-max`).textContent = fmt(stats.max);
       }
 
+      function renderThroughput(tp) {
+        if (!tp) return;
+        document.getElementById("tp-60").textContent = tp.last_60s ? fmt(tp.last_60s.msgs_per_sec) : "-";
+        document.getElementById("tp-300").textContent = tp.last_300s ? fmt(tp.last_300s.msgs_per_sec) : "-";
+        document.getElementById("tp-3600").textContent = tp.last_3600s ? fmt(tp.last_3600s.msgs_per_sec) : "-";
+        document.getElementById("tp-overall").textContent = tp.overall ? fmt(tp.overall.msgs_per_sec) : "-";
+        document.getElementById("tp-total").textContent = tp.overall ? tp.overall.count.toLocaleString() : "-";
+      }
+
       async function loadSchemes() {
         try {
           const res = await fetch("/api/schemes");
@@ -100,8 +117,9 @@
           select.innerHTML = '<option value="">-- all schemes --</option>';
           data.schemes.forEach(s => {
             const opt = document.createElement("option");
-            opt.value = s;
-            opt.textContent = s;
+            opt.value = s.scheme;
+            const mps = s.avg_msgs_per_sec > 0 ? ` | ${s.avg_msgs_per_sec} msg/s` : "";
+            opt.textContent = `${s.scheme} (${s.count.toLocaleString()} msgs${mps})`;
             select.appendChild(opt);
           });
           statusEl.textContent = `${data.schemes.length} scheme(s) available`;
@@ -110,8 +128,7 @@
         }
       }
 
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
+      async function loadMetrics() {
         loadBtn.disabled = true;
         loadBtn.textContent = "Loading...";
         const scheme = select.value;
@@ -124,6 +141,7 @@
           renderCard("pull", payload.pull_to_persist);
           renderCard("queue", payload.queue_to_db);
           renderCard("factor", payload.factor_time);
+          renderThroughput(payload.throughput);
           statusEl.textContent = `Showing metrics for scheme: ${payload.scheme || "All"}`;
         } catch {
           statusEl.textContent = "Request failed.";
@@ -131,6 +149,11 @@
           loadBtn.disabled = false;
           loadBtn.textContent = "Load";
         }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        loadMetrics();
       });
 
       loadSchemes();

@@ -66,8 +66,8 @@ CFGEOF
         data        = <<CLUSTEREOF
 scaling "cluster_policy" {
   enabled = true
-  min     = 2
-  max     = 5
+  min     = 3
+  max     = 8
 
   policy {
     cooldown            = "2m"

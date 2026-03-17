@@ -36,8 +36,8 @@ PYEOF
       }
 
       resources {
-        cpu    = 256
-        memory = 512
+        cpu    = 512
+        memory = 1024
       }
 
       service {

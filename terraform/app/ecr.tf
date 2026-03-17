@@ -13,3 +13,19 @@ output "flask_app_ecr_repository_url" {
   value       = aws_ecr_repository.flask_app.repository_url
   description = "ECR repository URL for the Flask app image."
 }
+
+resource "aws_ecr_repository" "factor_worker" {
+  name                 = "factor-worker"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.tags
+}
+
+output "factor_worker_ecr_repository_url" {
+  value       = aws_ecr_repository.factor_worker.repository_url
+  description = "ECR repository URL for the factor worker image."
+}

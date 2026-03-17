@@ -1,8 +1,15 @@
-import boto3, datetime, time, os, logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import boto3, time, os, logging, threading
+from concurrent.futures import ProcessPoolExecutor
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
+
+QUEUE_NAME = os.getenv("FACTOR_QUEUE_NAME", "SQS_FACTOR_DEV")
+RESULT_QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
+VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "60"))
+MAX_WORKERS = int(os.getenv("FACTOR_WORKERS", "4"))
+RECEIVER_THREADS = int(os.getenv("RECEIVER_THREADS", "8"))
+
 
 def do_factor(in_num):
     if in_num <= 1:
@@ -19,89 +26,113 @@ def do_factor(in_num):
                 large.append(other)
     return small + large[::-1]
 
-sqs = boto3.client('sqs', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 
-QUEUE_NAME = os.getenv("FACTOR_QUEUE_NAME", "SQS_FACTOR_DEV")
-RESULT_QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
-VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
-MAX_WORKERS = 8
+def _timed_factor(factor):
+    t0 = time.monotonic()
+    result = do_factor(factor)
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+    return result, elapsed_ms
 
-def _resolve_queue_url(queue_name_or_url):
-    if queue_name_or_url.startswith("https://"):
-        return queue_name_or_url
-    return sqs.get_queue_url(QueueName=queue_name_or_url)["QueueUrl"]
 
-queue_url = _resolve_queue_url(QUEUE_NAME)
-send_queue_url = _resolve_queue_url(RESULT_QUEUE_NAME)
-
-def _build_entries(index, message):
+def _build_entry(index, message, factor_list, factor_time_ms):
     pulled_time_ms = int(time.time() * 1000)
     factor = int(message["MessageAttributes"]["Factor"]["StringValue"])
     scheme = int(message["MessageAttributes"]["Scheme"]["StringValue"])
     sent_time = int(message["Attributes"]["SentTimestamp"])
     seq = message["MessageId"]
-    t0 = time.monotonic()
-    factor_list = do_factor(factor)
-    factor_time_ms = int((time.monotonic() - t0) * 1000)
     ms = max(0, pulled_time_ms - sent_time)
 
     send_entry = {
         'Id': str(index),
         'DelaySeconds': 0,
         'MessageAttributes': {
-            'Result':    {'DataType': 'String', 'StringValue': str(factor_list)},
-            'SentTime':  {'DataType': 'String', 'StringValue': str(sent_time)},
-            'PulledTime':{'DataType': 'String', 'StringValue': str(pulled_time_ms)},
-            'Sequence':  {'DataType': 'String', 'StringValue': str(seq)},
-            'Factor':    {'DataType': 'String', 'StringValue': str(factor)},
-            'Scheme':    {'DataType': 'String', 'StringValue': str(scheme)},
-            'ms':        {'DataType': 'Number', 'StringValue': str(ms)},
-            'FactorTime':{'DataType': 'Number', 'StringValue': str(factor_time_ms)},
+            'Result':     {'DataType': 'String', 'StringValue': str(factor_list)},
+            'SentTime':   {'DataType': 'String', 'StringValue': str(sent_time)},
+            'PulledTime': {'DataType': 'String', 'StringValue': str(pulled_time_ms)},
+            'Sequence':   {'DataType': 'String', 'StringValue': str(seq)},
+            'Factor':     {'DataType': 'String', 'StringValue': str(factor)},
+            'Scheme':     {'DataType': 'String', 'StringValue': str(scheme)},
+            'ms':         {'DataType': 'Number', 'StringValue': str(ms)},
+            'FactorTime': {'DataType': 'Number', 'StringValue': str(factor_time_ms)},
         },
         'MessageBody': 'Factor'
     }
     delete_entry = {'Id': str(index), 'ReceiptHandle': message['ReceiptHandle']}
-    return index, send_entry, delete_entry
+    return send_entry, delete_entry
 
-done = False
-i = 0
-while not done:
-    i += 1
-    if i % 100 == 0:
-        logger.info("poll_count=%s", i)
-    response = sqs.receive_message(
-        QueueUrl=queue_url,
-        AttributeNames=['All'],
-        MaxNumberOfMessages=10,
-        MessageAttributeNames=['All'],
-        VisibilityTimeout=VISIBILITY_TIMEOUT_SECONDS,
-        WaitTimeSeconds=20
-    )
-    messages = response.get('Messages', [])
-    if not messages:
-        logger.info("no_messages_received")
-        break
 
-    logger.info("received_messages=%s", len(messages))
-    send_entries = [None] * len(messages)
-    delete_entries = [None] * len(messages)
-    max_workers = min(MAX_WORKERS, len(messages))
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(_build_entries, idx, msg) for idx, msg in enumerate(messages)]
-        for future in as_completed(futures):
-            idx, se, de = future.result()
-            send_entries[idx] = se
-            delete_entries[idx] = de
+def _receiver_loop(thread_id, pool, sqs, queue_url, send_queue_url):
+    """Pull from SQS, farm factor computation to the process pool, send results."""
+    empty_polls = 0
+    processed = 0
+    while True:
+        response = sqs.receive_message(
+            QueueUrl=queue_url,
+            AttributeNames=['All'],
+            MaxNumberOfMessages=10,
+            MessageAttributeNames=['All'],
+            VisibilityTimeout=VISIBILITY_TIMEOUT_SECONDS,
+            WaitTimeSeconds=20
+        )
+        messages = response.get('Messages', [])
+        if not messages:
+            empty_polls += 1
+            if empty_polls >= 3:
+                break
+            continue
+        empty_polls = 0
 
-    send_response = sqs.send_message_batch(QueueUrl=send_queue_url, Entries=send_entries)
-    failed_send = send_response.get("Failed", [])
-    if failed_send:
-        logger.error("send_failures=%s", failed_send)
-        failed_ids = {entry["Id"] for entry in failed_send}
-        delete_entries = [e for e in delete_entries if e["Id"] not in failed_ids]
-    else:
-        logger.info("sent_messages=%s", len(send_entries))
+        factors = [int(m["MessageAttributes"]["Factor"]["StringValue"]) for m in messages]
+        futures = [pool.submit(_timed_factor, f) for f in factors]
 
-    if delete_entries:
-        sqs.delete_message_batch(QueueUrl=queue_url, Entries=delete_entries)
-        logger.info("deleted_messages=%s", len(delete_entries))
+        send_entries = []
+        delete_entries = []
+        for idx, (msg, fut) in enumerate(zip(messages, futures)):
+            factor_list, factor_time_ms = fut.result()
+            se, de = _build_entry(idx, msg, factor_list, factor_time_ms)
+            send_entries.append(se)
+            delete_entries.append(de)
+
+        send_response = sqs.send_message_batch(
+            QueueUrl=send_queue_url, Entries=send_entries
+        )
+        failed_send = send_response.get("Failed", [])
+        if failed_send:
+            logger.error("thread=%s send_failures=%s", thread_id, failed_send)
+            failed_ids = {e["Id"] for e in failed_send}
+            delete_entries = [e for e in delete_entries if e["Id"] not in failed_ids]
+
+        if delete_entries:
+            sqs.delete_message_batch(QueueUrl=queue_url, Entries=delete_entries)
+
+        processed += len(messages)
+        if processed % 100 < 11:
+            logger.info("thread=%s processed=%s", thread_id, processed)
+
+    logger.info("thread=%s done processed=%s", thread_id, processed)
+
+
+if __name__ == "__main__":
+    sqs = boto3.client('sqs', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+
+    def _resolve(name):
+        return name if name.startswith("https://") else sqs.get_queue_url(QueueName=name)["QueueUrl"]
+
+    queue_url = _resolve(QUEUE_NAME)
+    send_queue_url = _resolve(RESULT_QUEUE_NAME)
+
+    pool = ProcessPoolExecutor(max_workers=MAX_WORKERS)
+    threads = []
+    for tid in range(RECEIVER_THREADS):
+        t = threading.Thread(
+            target=_receiver_loop,
+            args=(tid, pool, sqs, queue_url, send_queue_url),
+            daemon=True,
+        )
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+    pool.shutdown(wait=True)
+    logger.info("all_threads_done")

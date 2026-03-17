@@ -7,7 +7,7 @@ from psycopg2.extras import execute_values
 QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
 VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
 BATCH_SIZE = int(os.getenv("SQS_BATCH_SIZE", "10"))
-WORKER_COUNT = int(os.getenv("PERSIST_WORKER_COUNT", "4"))
+WORKER_COUNT = int(os.getenv("PERSIST_WORKER_COUNT", "8"))
 
 sqs = boto3.client('sqs', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 sec = boto3.client('secretsmanager', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
@@ -55,6 +55,14 @@ with init_conn.cursor() as _cur:
         CREATE TABLE IF NOT EXISTS factors (
             sequence UUID PRIMARY KEY,
             data JSONB NOT NULL
+        )
+    """)
+    _cur.execute("""
+        CREATE TABLE IF NOT EXISTS scheme_summary (
+            scheme TEXT PRIMARY KEY,
+            total_count BIGINT NOT NULL DEFAULT 0,
+            first_persisted_at_ms BIGINT,
+            last_persisted_at_ms BIGINT
         )
     """)
 init_conn.close()
@@ -114,7 +122,16 @@ def _parse_message(message):
         data["pulled_time"] = pulled_time_raw
 
     sequence = _uuid7(sent_time_raw if sent_time_raw and sent_time_raw.isdigit() else process_time)
-    return sequence, json.dumps(data), message['ReceiptHandle']
+    return sequence, json.dumps(data), message['ReceiptHandle'], str(scheme), persisted_at_ms
+
+_SUMMARY_UPSERT = """
+    INSERT INTO scheme_summary (scheme, total_count, first_persisted_at_ms, last_persisted_at_ms)
+    VALUES (%s, %s, %s, %s)
+    ON CONFLICT (scheme) DO UPDATE SET
+        total_count = scheme_summary.total_count + EXCLUDED.total_count,
+        first_persisted_at_ms = LEAST(scheme_summary.first_persisted_at_ms, EXCLUDED.first_persisted_at_ms),
+        last_persisted_at_ms = GREATEST(scheme_summary.last_persisted_at_ms, EXCLUDED.last_persisted_at_ms)
+"""
 
 def _worker(worker_id):
     conn = _ensure_db(conn_params, db_name)
@@ -137,16 +154,28 @@ def _worker(worker_id):
 
         rows = []
         receipts = []
+        scheme_batches = {}
         for msg in messages:
             try:
-                seq, data_json, receipt = _parse_message(msg)
+                seq, data_json, receipt, scheme, ts_ms = _parse_message(msg)
                 rows.append((seq, data_json))
                 receipts.append(receipt)
+                sb = scheme_batches.get(scheme)
+                if sb is None:
+                    scheme_batches[scheme] = {"count": 1, "min_ms": ts_ms, "max_ms": ts_ms}
+                else:
+                    sb["count"] += 1
+                    if ts_ms < sb["min_ms"]:
+                        sb["min_ms"] = ts_ms
+                    if ts_ms > sb["max_ms"]:
+                        sb["max_ms"] = ts_ms
             except Exception as e:
                 print(f"[worker-{worker_id}] parse error: {e}")
 
         if rows:
             execute_values(cur, 'INSERT INTO factors (sequence, data) VALUES %s ON CONFLICT (sequence) DO NOTHING', rows)
+            for scheme, sb in scheme_batches.items():
+                cur.execute(_SUMMARY_UPSERT, (scheme, sb["count"], sb["min_ms"], sb["max_ms"]))
             conn.commit()
 
         if receipts:

@@ -28,13 +28,13 @@ variable "client_cpu_total_compute" {
 variable "client_min_count" {
   description = "Minimum number of Nomad client nodes in the ASG."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "client_max_count" {
   description = "Maximum number of Nomad client nodes the autoscaler can scale to."
   type        = number
-  default     = 5
+  default     = 8
 }
 
 variable "nomad_autoscaler_version" {
@@ -87,7 +87,7 @@ variable "process_min_count" {
 variable "process_max_count" {
   description = "Maximum number of factor-process allocations the SQS scaler can create."
   type        = number
-  default     = 6
+  default     = 10
 }
 
 variable "persist_min_count" {
@@ -99,7 +99,7 @@ variable "persist_min_count" {
 variable "persist_max_count" {
   description = "Maximum number of factor-persist allocations the SQS scaler can create."
   type        = number
-  default     = 4
+  default     = 10
 }
 
 variable "msgs_per_instance" {

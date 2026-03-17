@@ -156,6 +156,14 @@ module "eks_cluster" {
       to_port     = 32767
       cidr_blocks = ["0.0.0.0/0"]
     }
+    ingress_vxlan = {
+      description = "Node to node Cilium VXLAN overlay"
+      protocol    = "udp"
+      from_port   = 8472
+      to_port     = 8472
+      type        = "ingress"
+      self        = true
+    }
   }
 
   tags = {

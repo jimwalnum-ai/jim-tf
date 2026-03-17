@@ -54,7 +54,7 @@ SCALING_RULES = [
         "job": "factor-process",
         "group": "process",
         "min": 2,
-        "max": 6,
+        "max": 10,
         "msgs_per_instance": 100,
     },
     {
@@ -62,7 +62,7 @@ SCALING_RULES = [
         "job": "factor-persist",
         "group": "persist",
         "min": 2,
-        "max": 4,
+        "max": 10,
         "msgs_per_instance": 100,
     },
 ]
