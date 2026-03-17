@@ -1,6 +1,6 @@
 # Terraform Infrastructure
 
-This repository contains the Terraform configurations for a multi-region AWS infrastructure spanning **us-east-1** and **us-west-2**.
+This repository contains the Terraform configurations for a multi-region AWS infrastructure spanning **us-east-1** and **us-west-2**. The platform is designed to sustain **1,000 messages per second** on smaller T4 instances, keeping compute costs low while maintaining throughput.
 
 ## Directory Overview
 
@@ -23,6 +23,8 @@ This repository contains the Terraform configurations for a multi-region AWS inf
 | `modules/vpc` | VPC, subnets, route tables, NAT gateways, flow logs |
 | `modules/eks` | EKS cluster, node groups, OIDC provider, security groups |
 | `modules/transit-gateway` | Transit Gateway and inspection routing |
+| `modules/tgw-route-tables` | Transit Gateway route tables, spoke/inspection attachments and propagation |
+| `modules/transit-egress-vpc` | Egress VPC with public/private subnets, NAT gateways, NACLs, flow logs |
 | `modules/inspect-vpc` | Inspection VPC for AWS Network Firewall |
 | `modules/kms` | KMS encryption keys |
 | `modules/s3` | S3 buckets |
