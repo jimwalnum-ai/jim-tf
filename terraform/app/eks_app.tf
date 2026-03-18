@@ -15,7 +15,8 @@ resource "kubernetes_secret_v1" "flask_app_db" {
 }
 
 resource "kubernetes_deployment_v1" "flask_app_deployment" {
-  depends_on = [module.eks_node_group]
+  depends_on       = [module.eks_node_group]
+  wait_for_rollout = false
 
   metadata {
     name      = "flask-app-deployment"

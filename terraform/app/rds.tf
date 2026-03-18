@@ -72,7 +72,8 @@ resource "aws_db_subnet_group" "factor" {
 resource "aws_db_instance" "factor" {
   identifier             = "factor"
   instance_class         = "db.t3.micro"
-  allocated_storage      = 5
+  allocated_storage      = 20
+  max_allocated_storage  = 100
   engine                 = "postgres"
   engine_version         = "17.2"
   db_name                = var.web_db_name
