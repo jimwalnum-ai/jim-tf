@@ -39,6 +39,7 @@ This repository contains the Terraform configurations for a multi-region AWS inf
 | `web/` | Flask web app — built and pushed to ECR by `app/web.tf` |
 | `security-agent/` | Python security agent — deployed to EKS via `app/` and `app-west/` |
 | `security-dashboard/` | Python security dashboard — deployed to EKS via `app/` and `app-west/` |
+| `observability-dashboard/` | Infrastructure observability dashboard — monitors EKS, Nomad, SQS, RDS, CloudWatch alarms with alerting via SNS |
 | `common/` | Shared variable definitions (symlinked) |
 
 ## Deployment Order
