@@ -4,7 +4,7 @@ This repository contains the Terraform configurations for a multi-region AWS inf
 
 ## Directory Overview
 
-### Terraform Root Modules
+### Infrastructue Root Modules
 
 | Directory | Region | Description |
 |---|---|---|

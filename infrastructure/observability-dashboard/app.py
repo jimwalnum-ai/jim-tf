@@ -6,6 +6,7 @@ and AWS resources (SQS, RDS, CloudWatch alarms). Fires SNS
 alerts when problems are detected.
 """
 
+import fnmatch
 import json
 import logging
 import os
@@ -42,6 +43,31 @@ NOMAD_IGNORED_DEAD_JOBS = {
 LOG_TAIL_BYTES = int(os.environ.get("LOG_TAIL_BYTES", "16384"))
 BASELINE_WINDOW = int(os.environ.get("BASELINE_WINDOW", "10"))
 VOLUME_SPIKE_FACTOR = float(os.environ.get("VOLUME_SPIKE_FACTOR", "3.0"))
+
+# Suppress noisy alerts. Comma-separated rules in "source:component_glob" format.
+# Glob patterns (fnmatch) are matched against the problem's component field.
+_DEFAULT_SUPPRESSED = ",".join([
+    "nomad-logs:logs/factor-process/*",
+    "nomad-logs:logs/factor-persist/*",
+    "sqs:queue/SQS_FACTOR_DEV",
+    "nomad:eval/factor-persist/*",
+    "nomad:eval/factor-process/*",
+])
+_suppressed_rules: list[tuple[str, str]] = []
+for _rule in os.environ.get("SUPPRESSED_ALERTS", _DEFAULT_SUPPRESSED).split(","):
+    _rule = _rule.strip()
+    if ":" in _rule:
+        _src, _pat = _rule.split(":", 1)
+        _suppressed_rules.append((_src.strip(), _pat.strip()))
+
+
+def _is_suppressed(problem: dict) -> bool:
+    src = problem.get("source", "")
+    comp = problem.get("component", "")
+    for rule_src, rule_pat in _suppressed_rules:
+        if src == rule_src and fnmatch.fnmatch(comp, rule_pat):
+            return True
+    return False
 
 _cache = {}
 _cache_lock = threading.Lock()
@@ -744,14 +770,17 @@ def collect_all():
     rds_data = check_rds()
     cw_data = check_cloudwatch_alarms()
 
-    current_problems = (
-        k8s["problems"]
-        + nomad["problems"]
-        + nomad_logs["problems"]
-        + sqs_data["problems"]
-        + rds_data["problems"]
-        + cw_data["problems"]
-    )
+    current_problems = [
+        p for p in (
+            k8s["problems"]
+            + nomad["problems"]
+            + nomad_logs["problems"]
+            + sqs_data["problems"]
+            + rds_data["problems"]
+            + cw_data["problems"]
+        )
+        if not _is_suppressed(p)
+    ]
     _stamp_problems(current_problems)
 
     all_history = _update_history(current_problems)

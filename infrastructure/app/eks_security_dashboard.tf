@@ -183,6 +183,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
               port = 8080
             }
             initial_delay_seconds = 5
+            timeout_seconds       = 3
             period_seconds        = 15
           }
 
@@ -192,6 +193,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
               port = 8080
             }
             initial_delay_seconds = 3
+            timeout_seconds       = 3
             period_seconds        = 5
           }
         }
