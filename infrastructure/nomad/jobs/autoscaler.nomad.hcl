@@ -67,7 +67,7 @@ CFGEOF
 scaling "cluster_policy" {
   enabled = true
   min     = 3
-  max     = 8
+  max     = 12
 
   policy {
     cooldown            = "2m"

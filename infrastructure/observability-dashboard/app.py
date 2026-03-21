@@ -32,6 +32,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CLUSTER_NAME = os.environ.get("CLUSTER_NAME", "unknown")
 NOMAD_ADDR = os.environ.get("NOMAD_ADDR", "")
 SQS_QUEUE_NAMES = [q.strip() for q in os.environ.get("SQS_QUEUE_NAMES", "").split(",") if q.strip()]
+FACTOR_TS_NAMESPACE = os.environ.get("FACTOR_TS_NAMESPACE", "factor-ts")
 RDS_INSTANCE_ID = os.environ.get("RDS_INSTANCE_ID", "")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "10"))
@@ -699,6 +700,113 @@ def check_cloudwatch_alarms():
 
 
 # ---------------------------------------------------------------------------
+# TypeScript Factor Pod checks
+# ---------------------------------------------------------------------------
+
+def check_factor_ts():
+    """Monitor pods in the factor-ts namespace — process, persist, and test-msg workloads."""
+    problems = []
+    summary = {
+        "pods_total": 0, "pods_running": 0, "pods_failed": 0,
+        "deployments_total": 0, "deployments_healthy": 0, "deployments_unhealthy": 0,
+        "cronjobs_total": 0, "cronjobs_active": 0,
+        "namespace": FACTOR_TS_NAMESPACE,
+    }
+    pods_detail: list[dict] = []
+
+    try:
+        v1 = k8s_client.CoreV1Api()
+        apps_v1 = k8s_client.AppsV1Api()
+        batch_v1 = k8s_client.BatchV1Api()
+
+        pods = v1.list_namespaced_pod(namespace=FACTOR_TS_NAMESPACE)
+        for pod in pods.items:
+            summary["pods_total"] += 1
+            phase = pod.status.phase
+            name = pod.metadata.name
+            restart_count = 0
+            container_ready = True
+
+            if pod.status.container_statuses:
+                for cs in pod.status.container_statuses:
+                    restart_count += cs.restart_count
+                    if not cs.ready:
+                        container_ready = False
+                    if cs.state and cs.state.waiting:
+                        reason = cs.state.waiting.reason or ""
+                        if reason in ("CrashLoopBackOff", "OOMKilled", "ImagePullBackOff", "ErrImagePull"):
+                            problems.append({
+                                "source": "factor-ts",
+                                "severity": "CRITICAL" if reason == "OOMKilled" else "HIGH",
+                                "component": f"pod/{name}",
+                                "message": f"Container {cs.name}: {reason}",
+                            })
+
+            pod_info = {
+                "name": name,
+                "phase": phase,
+                "ready": container_ready and phase == "Running",
+                "restarts": restart_count,
+                "app": pod.metadata.labels.get("app", ""),
+            }
+            pods_detail.append(pod_info)
+
+            if phase in ("Running", "Succeeded"):
+                summary["pods_running"] += 1
+            else:
+                summary["pods_failed"] += 1
+                if phase == "Failed":
+                    problems.append({
+                        "source": "factor-ts",
+                        "severity": "HIGH",
+                        "component": f"pod/{name}",
+                        "message": f"Pod in {phase} state",
+                    })
+
+            if restart_count > 5:
+                problems.append({
+                    "source": "factor-ts",
+                    "severity": "MEDIUM",
+                    "component": f"pod/{name}",
+                    "message": f"High restart count: {restart_count}",
+                })
+
+        deps = apps_v1.list_namespaced_deployment(namespace=FACTOR_TS_NAMESPACE)
+        for dep in deps.items:
+            summary["deployments_total"] += 1
+            name = dep.metadata.name
+            desired = dep.spec.replicas or 0
+            available = dep.status.available_replicas or 0
+            if available >= desired:
+                summary["deployments_healthy"] += 1
+            else:
+                summary["deployments_unhealthy"] += 1
+                problems.append({
+                    "source": "factor-ts",
+                    "severity": "HIGH",
+                    "component": f"deploy/{name}",
+                    "message": f"Unavailable replicas: {desired - available}/{desired}",
+                })
+
+        crons = batch_v1.list_namespaced_cron_job(namespace=FACTOR_TS_NAMESPACE)
+        for cj in crons.items:
+            summary["cronjobs_total"] += 1
+            if cj.status.active:
+                summary["cronjobs_active"] += len(cj.status.active)
+
+    except Exception as exc:
+        log.warning("Factor TS check failed: %s", exc)
+        problems.append({
+            "source": "factor-ts",
+            "severity": "MEDIUM",
+            "component": "api",
+            "message": f"Unable to query factor-ts namespace: {exc}",
+        })
+
+    return {"summary": summary, "pods": pods_detail, "problems": problems}
+
+
+# ---------------------------------------------------------------------------
 # Alerting
 # ---------------------------------------------------------------------------
 
@@ -769,6 +877,7 @@ def collect_all():
     sqs_data = check_sqs()
     rds_data = check_rds()
     cw_data = check_cloudwatch_alarms()
+    factor_ts = check_factor_ts()
 
     current_problems = [
         p for p in (
@@ -778,6 +887,7 @@ def collect_all():
             + sqs_data["problems"]
             + rds_data["problems"]
             + cw_data["problems"]
+            + factor_ts["problems"]
         )
         if not _is_suppressed(p)
     ]
@@ -808,6 +918,7 @@ def collect_all():
         "sqs": sqs_data,
         "rds": rds_data,
         "cloudwatch": cw_data,
+        "factor_ts": factor_ts,
         "all_problems": current_problems,
         "all_problems_30m": all_history,
         "problem_count": len(current_problems),

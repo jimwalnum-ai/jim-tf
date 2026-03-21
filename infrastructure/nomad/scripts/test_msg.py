@@ -38,6 +38,7 @@ def _build_entries(start_index, count, scheme):
             'MessageAttributes': {
                 'Factor': {'DataType': 'Number', 'StringValue': str(random.randint(4, scheme))},
                 'Scheme': {'DataType': 'Number', 'StringValue': str(scheme)},
+                'Runtime': {'DataType': 'String', 'StringValue': 'python'},
             },
         })
     return entries

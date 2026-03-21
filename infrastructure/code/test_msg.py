@@ -139,6 +139,10 @@ def _build_entries(start_index: int, count: int, scheme: int):
                         'DataType': 'Number',
                         'StringValue': str(scheme),
                     },
+                    'Runtime': {
+                        'DataType': 'String',
+                        'StringValue': 'python',
+                    },
                 },
             }
         )

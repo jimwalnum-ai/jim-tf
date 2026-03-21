@@ -82,35 +82,46 @@ def _db_conn():
             pass
 
 
+_RUNTIME_TABLES = {
+    "python": {"factors": "factors", "summary": "scheme_summary"},
+    "typescript": {"factors": "factors_ts", "summary": "scheme_summary_ts"},
+}
+
+
+def _tables_for(runtime):
+    return _RUNTIME_TABLES.get(runtime, _RUNTIME_TABLES["python"])
+
+
 def _ensure_table():
     try:
         with _db_conn() as conn:
             conn.autocommit = True
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS factors (
-                        sequence UUID PRIMARY KEY,
-                        data JSONB NOT NULL
+                for tbl in _RUNTIME_TABLES.values():
+                    cur.execute(
+                        f"""
+                        CREATE TABLE IF NOT EXISTS {tbl['factors']} (
+                            sequence UUID PRIMARY KEY,
+                            data JSONB NOT NULL
+                        )
+                        """
                     )
-                    """
-                )
-                cur.execute(
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_factors_scheme
-                        ON factors ((data->>'scheme'))
-                    """
-                )
-                cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS scheme_summary (
-                        scheme TEXT PRIMARY KEY,
-                        total_count BIGINT NOT NULL DEFAULT 0,
-                        first_persisted_at_ms BIGINT,
-                        last_persisted_at_ms BIGINT
+                    cur.execute(
+                        f"""
+                        CREATE INDEX IF NOT EXISTS idx_{tbl['factors']}_scheme
+                            ON {tbl['factors']} ((data->>'scheme'))
+                        """
                     )
-                    """
-                )
+                    cur.execute(
+                        f"""
+                        CREATE TABLE IF NOT EXISTS {tbl['summary']} (
+                            scheme TEXT PRIMARY KEY,
+                            total_count BIGINT NOT NULL DEFAULT 0,
+                            first_persisted_at_ms BIGINT,
+                            last_persisted_at_ms BIGINT
+                        )
+                        """
+                    )
     except Exception as exc:
         logger.warning("could not ensure tables exist: %s", exc)
 
@@ -119,7 +130,7 @@ _METRIC_KEYS = ["sent_to_persist_ms", "pull_to_persist_ms", "queue_to_db_ms", "f
 _METRIC_LABELS = ["sent_to_persist", "pull_to_persist", "queue_to_db", "factor_time"]
 
 
-def _build_agg_sql(where_clause=""):
+def _build_agg_sql(where_clause="", table="factors"):
     """Build a SQL query that computes count/avg/stddev/min/max per metric key."""
     agg_cols = []
     for key in _METRIC_KEYS:
@@ -131,7 +142,7 @@ def _build_agg_sql(where_clause=""):
             f"MIN({cast}) AS \"{key}_min\"",
             f"MAX({cast}) AS \"{key}_max\"",
         ])
-    sql = f"SELECT {', '.join(agg_cols)} FROM factors"
+    sql = f"SELECT {', '.join(agg_cols)} FROM {table}"
     if where_clause:
         sql += f" WHERE {where_clause}"
     return sql
@@ -155,7 +166,7 @@ def _row_to_stats(row):
 
 _THROUGHPUT_WINDOWS = [60, 300, 3600]
 
-def _build_throughput_sql(where_clause=""):
+def _build_throughput_sql(where_clause="", table="factors"):
     now_ms = "(extract(epoch from now()) * 1000)::bigint"
     ts = "(data->>'persisted_at_ms')::bigint"
     window_cols = []
@@ -169,7 +180,7 @@ def _build_throughput_sql(where_clause=""):
         f"MAX({ts}) AS last_ms",
         f"COUNT(*) AS total",
     ])
-    sql = f"SELECT {cols} FROM factors WHERE data->>'persisted_at_ms' IS NOT NULL"
+    sql = f"SELECT {cols} FROM {table} WHERE data->>'persisted_at_ms' IS NOT NULL"
     if where_clause:
         sql += f" AND ({where_clause})"
     return sql
@@ -241,11 +252,15 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if parsed.path == "/api/schemes":
+            query = parse_qs(parsed.query)
+            runtime = query.get("runtime", ["python"])[0]
+            tbls = _tables_for(runtime)
+            summary_tbl = tbls["summary"]
             def _do(conn):
                 with conn.cursor() as cur:
                     cur.execute(
-                        "SELECT scheme, total_count, first_persisted_at_ms, last_persisted_at_ms "
-                        "FROM scheme_summary ORDER BY last_persisted_at_ms DESC"
+                        f"SELECT scheme, total_count, first_persisted_at_ms, last_persisted_at_ms "
+                        f"FROM {summary_tbl} ORDER BY last_persisted_at_ms DESC"
                     )
                     return cur.fetchall()
             rows = self._query_with_retry(_do)
@@ -264,18 +279,21 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/scheme":
             query = parse_qs(parsed.query)
             scheme_value = query.get("scheme", [None])[0]
+            runtime = query.get("runtime", ["python"])[0]
+            tbls = _tables_for(runtime)
+            factors_tbl = tbls["factors"]
             def _do(conn):
                 with conn.cursor() as cur:
                     if scheme_value is None or scheme_value == "":
-                        cur.execute(_build_agg_sql())
+                        cur.execute(_build_agg_sql(table=factors_tbl))
                         agg_row = cur.fetchone()
-                        cur.execute(_build_throughput_sql())
+                        cur.execute(_build_throughput_sql(table=factors_tbl))
                         tp_row = cur.fetchone()
                     else:
                         where = "(data->>'scheme')::text = %s"
-                        cur.execute(_build_agg_sql(where), (scheme_value,))
+                        cur.execute(_build_agg_sql(where, table=factors_tbl), (scheme_value,))
                         agg_row = cur.fetchone()
-                        cur.execute(_build_throughput_sql(where), (scheme_value,))
+                        cur.execute(_build_throughput_sql(where, table=factors_tbl), (scheme_value,))
                         tp_row = cur.fetchone()
                     return agg_row, tp_row
             agg_row, tp_row = self._query_with_retry(_do)
@@ -283,6 +301,7 @@ class Handler(SimpleHTTPRequestHandler):
             throughput = _throughput_from_row(tp_row)
             self._json_response({
                 "scheme": scheme_value,
+                "runtime": runtime,
                 **stats,
                 "throughput": throughput,
             })
@@ -291,13 +310,16 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/throughput":
             query = parse_qs(parsed.query)
             scheme_value = query.get("scheme", [None])[0]
+            runtime = query.get("runtime", ["python"])[0]
+            tbls = _tables_for(runtime)
+            factors_tbl = tbls["factors"]
             def _do(conn):
                 with conn.cursor() as cur:
                     if scheme_value is None or scheme_value == "":
-                        cur.execute(_build_throughput_sql())
+                        cur.execute(_build_throughput_sql(table=factors_tbl))
                     else:
                         cur.execute(
-                            _build_throughput_sql("(data->>'scheme')::text = %s"),
+                            _build_throughput_sql("(data->>'scheme')::text = %s", table=factors_tbl),
                             (scheme_value,),
                         )
                     return cur.fetchone()

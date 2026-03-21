@@ -34,7 +34,7 @@ variable "client_min_count" {
 variable "client_max_count" {
   description = "Maximum number of Nomad client nodes the autoscaler can scale to."
   type        = number
-  default     = 8
+  default     = 12
 }
 
 variable "nomad_autoscaler_version" {
@@ -73,6 +73,16 @@ variable "factor_result_queue_name" {
   default = "SQS_FACTOR_RESULT_DEV"
 }
 
+variable "factor_ts_queue_name" {
+  type    = string
+  default = "SQS_FACTOR_TS_DEV"
+}
+
+variable "factor_ts_result_queue_name" {
+  type    = string
+  default = "SQS_FACTOR_RESULT_TS_DEV"
+}
+
 variable "rds_secret_name" {
   type    = string
   default = "cs-factor-credentials"
@@ -98,6 +108,30 @@ variable "persist_min_count" {
 
 variable "persist_max_count" {
   description = "Maximum number of factor-persist allocations the SQS scaler can create."
+  type        = number
+  default     = 10
+}
+
+variable "process_ts_min_count" {
+  description = "Minimum number of factor-process-ts allocations kept running."
+  type        = number
+  default     = 2
+}
+
+variable "process_ts_max_count" {
+  description = "Maximum number of factor-process-ts allocations the SQS scaler can create."
+  type        = number
+  default     = 10
+}
+
+variable "persist_ts_min_count" {
+  description = "Minimum number of factor-persist-ts allocations kept running."
+  type        = number
+  default     = 2
+}
+
+variable "persist_ts_max_count" {
+  description = "Maximum number of factor-persist-ts allocations the SQS scaler can create."
   type        = number
   default     = 10
 }

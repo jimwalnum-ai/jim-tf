@@ -6,6 +6,14 @@ data "aws_sqs_queue" "factor_result" {
   name = var.factor_result_queue_name
 }
 
+data "aws_sqs_queue" "factor_ts" {
+  name = var.factor_ts_queue_name
+}
+
+data "aws_sqs_queue" "factor_ts_result" {
+  name = var.factor_ts_result_queue_name
+}
+
 resource "aws_iam_role" "nomad_node" {
   name = "${local.name_prefix}-node"
 
@@ -41,7 +49,9 @@ resource "aws_iam_role_policy" "nomad_sqs" {
       ]
       Resource = [
         data.aws_sqs_queue.factor.arn,
-        data.aws_sqs_queue.factor_result.arn
+        data.aws_sqs_queue.factor_result.arn,
+        data.aws_sqs_queue.factor_ts.arn,
+        data.aws_sqs_queue.factor_ts_result.arn
       ]
     }]
   })
@@ -112,7 +122,9 @@ resource "aws_iam_role_policy" "nomad_autoscaler" {
         ]
         Resource = [
           data.aws_sqs_queue.factor.arn,
-          data.aws_sqs_queue.factor_result.arn
+          data.aws_sqs_queue.factor_result.arn,
+          data.aws_sqs_queue.factor_ts.arn,
+          data.aws_sqs_queue.factor_ts_result.arn
         ]
       },
       {

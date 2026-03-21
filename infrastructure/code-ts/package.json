@@ -1,0 +1,21 @@
+{
+  "name": "factor-ts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test-msg": "node dist/test_msg.js",
+    "process": "node dist/process.js",
+    "persist": "node dist/persist.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.750.0",
+    "@aws-sdk/client-sqs": "^3.750.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.7.0"
+  }
+}

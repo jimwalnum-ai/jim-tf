@@ -65,6 +65,22 @@ SCALING_RULES = [
         "max": 10,
         "msgs_per_instance": 100,
     },
+    {
+        "queue": "SQS_FACTOR_TS_DEV",
+        "job": "factor-process-ts",
+        "group": "process-ts",
+        "min": 2,
+        "max": 10,
+        "msgs_per_instance": 100,
+    },
+    {
+        "queue": "SQS_FACTOR_RESULT_TS_DEV",
+        "job": "factor-persist-ts",
+        "group": "persist-ts",
+        "min": 2,
+        "max": 10,
+        "msgs_per_instance": 100,
+    },
 ]
 
 sqs = boto3.client("sqs", region_name=REGION)

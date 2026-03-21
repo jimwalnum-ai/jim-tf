@@ -92,3 +92,44 @@ resource "terraform_data" "job_factor_test_msg" {
     }
   }
 }
+
+# ── TypeScript jobs ──────────────────────────────────────────────────
+
+resource "terraform_data" "job_factor_process_ts" {
+  triggers_replace = filemd5("${path.module}/jobs/process_ts.nomad.hcl")
+
+  depends_on = [terraform_data.wait_for_nomad]
+
+  provisioner "local-exec" {
+    command = "nomad job run -detach ${path.module}/jobs/process_ts.nomad.hcl"
+    environment = {
+      NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
+    }
+  }
+}
+
+resource "terraform_data" "job_factor_persist_ts" {
+  triggers_replace = filemd5("${path.module}/jobs/persist_ts.nomad.hcl")
+
+  depends_on = [terraform_data.wait_for_nomad]
+
+  provisioner "local-exec" {
+    command = "nomad job run -detach ${path.module}/jobs/persist_ts.nomad.hcl"
+    environment = {
+      NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
+    }
+  }
+}
+
+resource "terraform_data" "job_factor_test_msg_ts" {
+  triggers_replace = filemd5("${path.module}/jobs/test_msg_ts.nomad.hcl")
+
+  depends_on = [terraform_data.wait_for_nomad]
+
+  provisioner "local-exec" {
+    command = "nomad job run -detach ${path.module}/jobs/test_msg_ts.nomad.hcl"
+    environment = {
+      NOMAD_ADDR = "http://${aws_lb.nomad.dns_name}:4646"
+    }
+  }
+}

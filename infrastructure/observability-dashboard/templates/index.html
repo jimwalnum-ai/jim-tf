@@ -50,6 +50,10 @@
       <div class="card-value">{{ data.nomad_logs.summary.total_anomalies }}</div>
       <div class="card-label">Log Anomalies</div>
     </div>
+    <div class="card card-clickable {{ 'card-error' if data.factor_ts.summary.pods_failed > 0 else 'card-ok' }}" data-filter="source:factor-ts">
+      <div class="card-value">{{ data.factor_ts.summary.pods_running }}/{{ data.factor_ts.summary.pods_total }}</div>
+      <div class="card-label">TS Factor Pods</div>
+    </div>
   </section>
 
   <!-- Expandable detail drawer (populated by card clicks) -->
@@ -238,6 +242,77 @@
     {% endif %}
     {% else %}
     <p class="text-muted">No running Nomad tasks to scan{% if not data.nomad.summary.reachable %} (Nomad unreachable){% endif %}.</p>
+    {% endif %}
+  </section>
+
+  <!-- TypeScript Factor Pods -->
+  <section class="panel">
+    <h2>TypeScript Factor Pods</h2>
+    {% if data.factor_ts.summary.pods_total > 0 %}
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Namespace</span>
+        <span class="detail-value"><code>{{ data.factor_ts.summary.namespace }}</code></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Pods</span>
+        <span class="detail-value">{{ data.factor_ts.summary.pods_running }} running / {{ data.factor_ts.summary.pods_total }} total
+          {% if data.factor_ts.summary.pods_failed > 0 %}
+          <span class="badge-warn">{{ data.factor_ts.summary.pods_failed }} failed</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Deployments</span>
+        <span class="detail-value">{{ data.factor_ts.summary.deployments_healthy }} healthy / {{ data.factor_ts.summary.deployments_total }} total
+          {% if data.factor_ts.summary.deployments_unhealthy > 0 %}
+          <span class="badge-warn">{{ data.factor_ts.summary.deployments_unhealthy }} degraded</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">CronJobs</span>
+        <span class="detail-value">{{ data.factor_ts.summary.cronjobs_total }} defined
+          {% if data.factor_ts.summary.cronjobs_active > 0 %}
+          <span class="badge-ok">{{ data.factor_ts.summary.cronjobs_active }} active</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    {% if data.factor_ts.pods %}
+    <table class="mt-1">
+      <thead>
+        <tr>
+          <th>Pod</th>
+          <th>App</th>
+          <th>Phase</th>
+          <th>Ready</th>
+          <th>Restarts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pod in data.factor_ts.pods %}
+        <tr class="{{ 'row-high' if pod.phase == 'Failed' else ('row-medium' if not pod.ready else '') }}">
+          <td class="mono">{{ pod.name }}</td>
+          <td>{{ pod.app }}</td>
+          <td>
+            <span class="badge-{{ 'ok' if pod.phase in ('Running', 'Succeeded') else 'warn' }}">{{ pod.phase }}</span>
+          </td>
+          <td>
+            {% if pod.ready %}
+            <span class="badge-ok">Ready</span>
+            {% else %}
+            <span class="badge-warn">Not Ready</span>
+            {% endif %}
+          </td>
+          <td>{{ pod.restarts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% else %}
+    <p class="text-muted">No pods found in the <code>{{ data.factor_ts.summary.namespace }}</code> namespace.</p>
     {% endif %}
   </section>
 

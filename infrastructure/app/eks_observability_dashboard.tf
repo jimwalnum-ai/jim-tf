@@ -242,7 +242,11 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
           }
           env {
             name  = "SQS_QUEUE_NAMES"
-            value = "SQS_FACTOR_DEV,SQS_FACTOR_RESULT_DEV"
+            value = "SQS_FACTOR_DEV,SQS_FACTOR_RESULT_DEV,${aws_sqs_queue.factor_ts.name},${aws_sqs_queue.factor_result_ts.name}"
+          }
+          env {
+            name  = "FACTOR_TS_NAMESPACE"
+            value = ""
           }
           env {
             name  = "RDS_INSTANCE_ID"

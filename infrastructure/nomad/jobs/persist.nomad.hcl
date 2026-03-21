@@ -33,7 +33,8 @@ from psycopg2.extras import execute_values
 
 QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
 VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "300"))
-BATCH_SIZE = int(os.getenv("SQS_BATCH_SIZE", "10"))
+BATCH_SIZE = 10
+COMMIT_SIZE = int(os.getenv("PERSIST_COMMIT_SIZE", "100"))
 WORKER_COUNT = int(os.getenv("PERSIST_WORKER_COUNT", "8"))
 
 sqs = boto3.client('sqs', region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
@@ -130,11 +131,14 @@ def _parse_message(message):
     else:
         pull_to_persist_ms = persisted_at_ms - pulled_at_ms
 
+    runtime = msg_json.get("Runtime", {}).get("StringValue", "python")
+
     data = {
         "factor": int(msg_json["Factor"]["StringValue"]),
         "result": result, "scheme": scheme, "ms": ms,
         "queue_to_db_ms": ms, "pulled_at_ms": pulled_at_ms,
         "persisted_at_ms": persisted_at_ms, "pull_to_persist_ms": pull_to_persist_ms,
+        "runtime": runtime,
     }
     if factor_time_raw and factor_time_raw.isdigit():
         data["factor_time_ms"] = int(factor_time_raw)
@@ -160,28 +164,47 @@ _SUMMARY_UPSERT = """
         last_persisted_at_ms = GREATEST(scheme_summary.last_persisted_at_ms, EXCLUDED.last_persisted_at_ms)
 """
 
+def _flush(cur, conn, rows, receipts, scheme_batches, worker_id):
+    if not rows:
+        return
+    execute_values(cur, 'INSERT INTO factors (sequence, data) VALUES %s ON CONFLICT (sequence) DO NOTHING', rows)
+    for scheme, sb in scheme_batches.items():
+        cur.execute(_SUMMARY_UPSERT, (scheme, sb["count"], sb["min_ms"], sb["max_ms"]))
+    conn.commit()
+    for i in range(0, len(receipts), 10):
+        batch = [{'Id': str(j), 'ReceiptHandle': r} for j, r in enumerate(receipts[i:i+10])]
+        sqs.delete_message_batch(QueueUrl=queue_url, Entries=batch)
+    print(f"[worker-{worker_id}] persisted {len(rows)} messages")
+
 def _worker(worker_id):
     conn = _ensure_db(conn_params, db_name)
     conn.autocommit = False
     cur = conn.cursor()
     print(f"[worker-{worker_id}] started")
 
+    rows = []
+    receipts = []
+    scheme_batches = {}
+
     while True:
+        wait = 20 if not rows else 0
         resp = sqs.receive_message(
             QueueUrl=queue_url,
             AttributeNames=['All'],
             MaxNumberOfMessages=BATCH_SIZE,
             MessageAttributeNames=['All'],
             VisibilityTimeout=VISIBILITY_TIMEOUT_SECONDS,
-            WaitTimeSeconds=20,
+            WaitTimeSeconds=wait,
         )
         messages = resp.get('Messages', [])
-        if not messages:
-            break
 
-        rows = []
-        receipts = []
-        scheme_batches = {}
+        if not messages:
+            _flush(cur, conn, rows, receipts, scheme_batches, worker_id)
+            if wait == 20:
+                break
+            rows, receipts, scheme_batches = [], [], {}
+            continue
+
         for msg in messages:
             try:
                 seq, data_json, receipt, scheme, ts_ms = _parse_message(msg)
@@ -199,18 +222,9 @@ def _worker(worker_id):
             except Exception as e:
                 print(f"[worker-{worker_id}] parse error: {e}")
 
-        if rows:
-            execute_values(cur, 'INSERT INTO factors (sequence, data) VALUES %s ON CONFLICT (sequence) DO NOTHING', rows)
-            for scheme, sb in scheme_batches.items():
-                cur.execute(_SUMMARY_UPSERT, (scheme, sb["count"], sb["min_ms"], sb["max_ms"]))
-            conn.commit()
-
-        if receipts:
-            for i in range(0, len(receipts), 10):
-                batch = [{'Id': str(j), 'ReceiptHandle': r} for j, r in enumerate(receipts[i:i+10])]
-                sqs.delete_message_batch(QueueUrl=queue_url, Entries=batch)
-
-        print(f"[worker-{worker_id}] persisted {len(rows)} messages")
+        if len(rows) >= COMMIT_SIZE:
+            _flush(cur, conn, rows, receipts, scheme_batches, worker_id)
+            rows, receipts, scheme_batches = [], [], {}
 
     cur.close()
     conn.close()

@@ -12,14 +12,20 @@ resource "local_file" "autoscaler_job" {
 resource "local_file" "sqs_scaler_job" {
   filename = "${path.module}/jobs/sqs_scaler.nomad.hcl"
   content = templatefile("${path.module}/templates/sqs_scaler.nomad.hcl.tpl", {
-    docker_image             = var.docker_tasks_image
-    factor_queue_name        = var.factor_queue_name
-    factor_result_queue_name = var.factor_result_queue_name
-    process_min_count        = var.process_min_count
-    process_max_count        = var.process_max_count
-    persist_min_count        = var.persist_min_count
-    persist_max_count        = var.persist_max_count
-    msgs_per_instance        = var.msgs_per_instance
+    docker_image                = var.docker_tasks_image
+    factor_queue_name           = var.factor_queue_name
+    factor_result_queue_name    = var.factor_result_queue_name
+    factor_ts_queue_name        = var.factor_ts_queue_name
+    factor_ts_result_queue_name = var.factor_ts_result_queue_name
+    process_min_count           = var.process_min_count
+    process_max_count           = var.process_max_count
+    persist_min_count           = var.persist_min_count
+    persist_max_count           = var.persist_max_count
+    process_ts_min_count        = var.process_ts_min_count
+    process_ts_max_count        = var.process_ts_max_count
+    persist_ts_min_count        = var.persist_ts_min_count
+    persist_ts_max_count        = var.persist_ts_max_count
+    msgs_per_instance           = var.msgs_per_instance
   })
 }
 

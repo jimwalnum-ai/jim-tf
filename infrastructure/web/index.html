@@ -8,12 +8,27 @@
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: system-ui, sans-serif; padding: 2rem; background: #f5f7fa; color: #1a1a2e; }
       h1 { font-size: 1.6rem; margin-bottom: 1.5rem; }
-      form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+      .runtime-sections { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+      .runtime-section {
+        flex: 1; min-width: 280px; padding: 1.25rem;
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .runtime-section h2 {
+        font-size: 1.1rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .runtime-section h2.python { color: #2563eb; }
+      .runtime-section h2.typescript { color: #0ea5e9; }
+      .runtime-section form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
       select, button { padding: 0.5rem 0.8rem; font-size: 0.95rem; border: 1px solid #ccc; border-radius: 6px; }
-      select { min-width: 180px; background: #fff; }
-      button { background: #2563eb; color: #fff; border: none; cursor: pointer; }
-      button:hover { background: #1d4ed8; }
+      select { min-width: 180px; background: #fff; flex: 1; }
+      .btn-python { background: #2563eb; color: #fff; border: none; cursor: pointer; }
+      .btn-python:hover { background: #1d4ed8; }
+      .btn-typescript { background: #0ea5e9; color: #fff; border: none; cursor: pointer; }
+      .btn-typescript:hover { background: #0284c7; }
       button:disabled { background: #94a3b8; cursor: not-allowed; }
+      .section-status { color: #64748b; font-size: 0.85rem; margin-top: 0.5rem; }
       .status { color: #64748b; font-size: 0.9rem; margin-top: 0.75rem; }
       .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
       .card {
@@ -30,14 +45,31 @@
   </head>
   <body>
     <h1>Scheme Metrics</h1>
-    <form id="scheme-form">
-      <label for="scheme">Scheme</label>
-      <select id="scheme">
-        <option value="">-- select a scheme --</option>
-      </select>
-      <button type="submit" id="load-btn">Load</button>
-    </form>
-    <div class="status" id="status">Loading schemes...</div>
+
+    <div class="runtime-sections">
+      <div class="runtime-section">
+        <h2 class="python">Python Schemes</h2>
+        <form id="form-python">
+          <select id="scheme-python">
+            <option value="">-- select a scheme --</option>
+          </select>
+          <button type="submit" class="btn-python" id="load-btn-python">Load</button>
+        </form>
+        <div class="section-status" id="status-python">Loading...</div>
+      </div>
+      <div class="runtime-section">
+        <h2 class="typescript">TypeScript Schemes</h2>
+        <form id="form-typescript">
+          <select id="scheme-typescript">
+            <option value="">-- select a scheme --</option>
+          </select>
+          <button type="submit" class="btn-typescript" id="load-btn-typescript">Load</button>
+        </form>
+        <div class="section-status" id="status-typescript">Loading...</div>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
 
     <div class="cards" id="results" style="display:none;">
       <div class="card" id="card-sent">
@@ -83,9 +115,6 @@
     </div>
 
     <script>
-      const form = document.getElementById("scheme-form");
-      const select = document.getElementById("scheme");
-      const loadBtn = document.getElementById("load-btn");
       const statusEl = document.getElementById("status");
       const resultsEl = document.getElementById("results");
 
@@ -110,9 +139,11 @@
         document.getElementById("tp-total").textContent = tp.overall ? tp.overall.count.toLocaleString() : "-";
       }
 
-      async function loadSchemes() {
+      async function loadSchemes(runtime) {
+        const select = document.getElementById(`scheme-${runtime}`);
+        const sectionStatus = document.getElementById(`status-${runtime}`);
         try {
-          const res = await fetch("/api/schemes");
+          const res = await fetch(`/api/schemes?runtime=${runtime}`);
           const data = await res.json();
           select.innerHTML = '<option value="">-- all schemes --</option>';
           data.schemes.forEach(s => {
@@ -122,19 +153,22 @@
             opt.textContent = `${s.scheme} (${s.count.toLocaleString()} msgs${mps})`;
             select.appendChild(opt);
           });
-          statusEl.textContent = `${data.schemes.length} scheme(s) available`;
+          sectionStatus.textContent = `${data.schemes.length} scheme(s) available`;
         } catch {
-          statusEl.textContent = "Failed to load schemes.";
+          sectionStatus.textContent = "Failed to load schemes.";
         }
       }
 
-      async function loadMetrics() {
-        loadBtn.disabled = true;
-        loadBtn.textContent = "Loading...";
+      async function loadMetrics(runtime) {
+        const select = document.getElementById(`scheme-${runtime}`);
+        const btn = document.getElementById(`load-btn-${runtime}`);
+        btn.disabled = true;
+        btn.textContent = "Loading...";
         const scheme = select.value;
-        const query = scheme ? `?scheme=${encodeURIComponent(scheme)}` : "";
+        const params = new URLSearchParams({ runtime });
+        if (scheme) params.set("scheme", scheme);
         try {
-          const res = await fetch(`/api/scheme${query}`);
+          const res = await fetch(`/api/scheme?${params}`);
           const payload = await res.json();
           resultsEl.style.display = "";
           renderCard("sent", payload.sent_to_persist);
@@ -142,21 +176,27 @@
           renderCard("queue", payload.queue_to_db);
           renderCard("factor", payload.factor_time);
           renderThroughput(payload.throughput);
-          statusEl.textContent = `Showing metrics for scheme: ${payload.scheme || "All"}`;
+          const runtimeLabel = runtime.charAt(0).toUpperCase() + runtime.slice(1);
+          statusEl.textContent = `${runtimeLabel} — scheme: ${payload.scheme || "All"}`;
         } catch {
           statusEl.textContent = "Request failed.";
         } finally {
-          loadBtn.disabled = false;
-          loadBtn.textContent = "Load";
+          btn.disabled = false;
+          btn.textContent = "Load";
         }
       }
 
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        loadMetrics();
+      document.getElementById("form-python").addEventListener("submit", (e) => {
+        e.preventDefault();
+        loadMetrics("python");
+      });
+      document.getElementById("form-typescript").addEventListener("submit", (e) => {
+        e.preventDefault();
+        loadMetrics("typescript");
       });
 
-      loadSchemes();
+      loadSchemes("python");
+      loadSchemes("typescript");
     </script>
   </body>
 </html>

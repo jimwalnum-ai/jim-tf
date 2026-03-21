@@ -42,6 +42,8 @@ def _build_entry(index, message, factor_list, factor_time_ms):
     seq = message["MessageId"]
     ms = max(0, pulled_time_ms - sent_time)
 
+    runtime = message.get("MessageAttributes", {}).get("Runtime", {}).get("StringValue", "python")
+
     send_entry = {
         'Id': str(index),
         'DelaySeconds': 0,
@@ -54,6 +56,7 @@ def _build_entry(index, message, factor_list, factor_time_ms):
             'Scheme':     {'DataType': 'String', 'StringValue': str(scheme)},
             'ms':         {'DataType': 'Number', 'StringValue': str(ms)},
             'FactorTime': {'DataType': 'Number', 'StringValue': str(factor_time_ms)},
+            'Runtime':    {'DataType': 'String', 'StringValue': runtime},
         },
         'MessageBody': 'Factor'
     }

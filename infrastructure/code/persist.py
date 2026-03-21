@@ -115,11 +115,14 @@ def _parse_message(message):
     else:
         pull_to_persist_ms = persisted_at_ms - pulled_at_ms
 
+    runtime = msg_json.get("Runtime", {}).get("StringValue", "python")
+
     data = {
         "factor": int(msg_json["Factor"]["StringValue"]),
         "result": result, "scheme": scheme, "ms": ms,
         "queue_to_db_ms": ms, "pulled_at_ms": pulled_at_ms,
         "persisted_at_ms": persisted_at_ms, "pull_to_persist_ms": pull_to_persist_ms,
+        "runtime": runtime,
     }
     if factor_time_raw and factor_time_raw.isdigit():
         data["factor_time_ms"] = int(factor_time_raw)
