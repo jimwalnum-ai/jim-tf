@@ -107,6 +107,7 @@ resource "aws_iam_role_policy" "nomad_autoscaler" {
           "autoscaling:SetDesiredCapacity",
           "autoscaling:DescribeAutoScalingGroups",
           "autoscaling:DescribeScalingActivities",
+          "autoscaling:DescribeInstanceRefreshes",
           "autoscaling:UpdateAutoScalingGroup",
           "autoscaling:CreateOrUpdateTags",
           "autoscaling:TerminateInstanceInAutoScalingGroup"

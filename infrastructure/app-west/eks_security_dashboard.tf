@@ -4,7 +4,7 @@
 
 resource "aws_ecr_repository" "security_dashboard" {
   name                 = "cilium-security-dashboard"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true

@@ -211,9 +211,29 @@ resource "aws_instance" "gitlab" {
 }
 
 
+resource "aws_iam_role" "ec2_workload" {
+  name = "cs-ec2-workload"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_workload_ssm" {
+  role       = aws_iam_role.ec2_workload.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_instance_profile" "private" {
-  name = "cs-terraform-role"
-  role = "cs-terraform-role"
+  name = "cs-ec2-workload"
+  role = aws_iam_role.ec2_workload.name
 }
 
 resource "aws_instance" "ec2_private_instance" {
@@ -231,10 +251,6 @@ resource "aws_instance" "ec2_private_instance" {
   tags = merge(local.tags, { Name = "test-ec2-priv" })
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_ssm_core" {
-  role       = "cs-terraform-role"
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
 
 resource "aws_security_group" "public_instance" {
   name        = "public-default"

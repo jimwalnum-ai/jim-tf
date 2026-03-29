@@ -83,6 +83,8 @@ resource "aws_db_instance" "factor" {
   vpc_security_group_ids = [aws_security_group.vpc_only.id]
   parameter_group_name   = aws_db_parameter_group.factor.name
   publicly_accessible      = false
+  storage_encrypted        = true
+  deletion_protection      = true
   skip_final_snapshot      = true
   backup_retention_period  = 7
   backup_window            = "03:00-04:00"

@@ -12,7 +12,6 @@ locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
   prefix            = "csx3"
   enable_ecs        = var.enable_ecs
-  env               = terraform.workspace
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }
   top_tagmap        = csvdecode(file("../top_level_tags.csv"))
@@ -23,10 +22,9 @@ locals {
   tf_src            = format("%s/%s", element(local.ws, length(local.ws) - 2), element(local.ws, length(local.ws) - 1))
   extra_tags        = { "application" : local.app, "source" : local.tf_src }
   all_tags          = merge(local.extra_tags, local.date_tag, local.top_tags, local.dir_tags)
-  # Can define a specific local.tf in the directory to set application, other tags
-  acct_name = element(local.ws, length(local.ws) - 2)
-  acct_id   = data.aws_caller_identity.current.account_id
-  tags      = local.all_tags
+  acct_name         = element(local.ws, length(local.ws) - 2)
+  acct_id           = data.aws_caller_identity.current.account_id
+  tags              = local.all_tags
 }
 
 resource "time_static" "date" {}
@@ -36,17 +34,6 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = ">= 6.0.0"
-    }
-    awscc = {
-      source = "hashicorp/awscc"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.35"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = ">= 2.12.0"
     }
   }
 }

@@ -12,6 +12,20 @@ resource "aws_sqs_queue" "factor_result_dev" {
   tags                       = local.tags
 }
 
+resource "aws_sqs_queue" "factor_ts" {
+  name                       = "SQS_FACTOR_TS_DEV"
+  visibility_timeout_seconds = 60
+  message_retention_seconds  = 345600
+  tags                       = local.tags
+}
+
+resource "aws_sqs_queue" "factor_result_ts" {
+  name                       = "SQS_FACTOR_RESULT_TS_DEV"
+  visibility_timeout_seconds = 300
+  message_retention_seconds  = 345600
+  tags                       = local.tags
+}
+
 resource "aws_sqs_queue" "results_updates_dl_queue" {
   name = "SQS_FACTOR_DLQ"
   tags = local.tags
@@ -104,4 +118,58 @@ resource "aws_sqs_queue_policy" "factor_result_queue_policy" {
 resource "aws_sqs_queue_policy" "results_updates_dl_queue_policy" {
   queue_url = aws_sqs_queue.results_updates_dl_queue.id
   policy    = data.aws_iam_policy_document.sqs_access_results_updates_dl_queue.json
+}
+
+data "aws_iam_policy_document" "sqs_access_factor_ts" {
+  statement {
+    sid    = "SqsAccess"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = local.sqs_allowed_principals
+    }
+    actions = [
+      "sqs:SendMessage",
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:ChangeMessageVisibility",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl"
+    ]
+    resources = [
+      aws_sqs_queue.factor_ts.arn
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "sqs_access_factor_result_ts" {
+  statement {
+    sid    = "SqsAccess"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = local.sqs_allowed_principals
+    }
+    actions = [
+      "sqs:SendMessage",
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:ChangeMessageVisibility",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl"
+    ]
+    resources = [
+      aws_sqs_queue.factor_result_ts.arn
+    ]
+  }
+}
+
+resource "aws_sqs_queue_policy" "factor_ts_queue_policy" {
+  queue_url = aws_sqs_queue.factor_ts.id
+  policy    = data.aws_iam_policy_document.sqs_access_factor_ts.json
+}
+
+resource "aws_sqs_queue_policy" "factor_result_ts_queue_policy" {
+  queue_url = aws_sqs_queue.factor_result_ts.id
+  policy    = data.aws_iam_policy_document.sqs_access_factor_result_ts.json
 }

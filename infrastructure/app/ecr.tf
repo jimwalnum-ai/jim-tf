@@ -1,6 +1,6 @@
 resource "aws_ecr_repository" "flask_app" {
   name                 = "flask-app"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
@@ -16,13 +16,34 @@ output "flask_app_ecr_repository_url" {
 
 resource "aws_ecr_repository" "factor_worker" {
   name                 = "factor-worker"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
   tags = local.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "factor_worker" {
+  repository = aws_ecr_repository.factor_worker.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep only the last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
 }
 
 output "factor_worker_ecr_repository_url" {

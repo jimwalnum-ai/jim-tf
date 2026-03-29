@@ -35,3 +35,18 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Node.js
+node_modules/
+dist/
+package-lock.json
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+runs/
+wandb/
+
+# Large data files
+data/cifar-10-python.tar.gz

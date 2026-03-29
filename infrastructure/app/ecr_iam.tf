@@ -59,10 +59,10 @@ resource "aws_ecr_repository_policy" "flask_app" {
         ]
       },
       {
-        Sid       = "AllowAccountPush"
+        Sid       = "AllowTerraformRolePush"
         Effect    = "Allow"
         Principal = {
-          AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
+          AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/cs-terraform-role"
         }
         Action = [
           "ecr:BatchCheckLayerAvailability",

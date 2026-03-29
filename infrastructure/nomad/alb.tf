@@ -4,18 +4,27 @@ resource "aws_security_group" "alb" {
   vpc_id      = data.aws_vpc.dev.id
 
   ingress {
-    description = "All inbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "Nomad UI from admin"
+    from_port   = 4646
+    to_port     = 4646
+    protocol    = "tcp"
+    cidr_blocks = [local.home_ip]
+  }
+
+  ingress {
+    description = "Consul UI from admin"
+    from_port   = 8500
+    to_port     = 8500
+    protocol    = "tcp"
+    cidr_blocks = [local.home_ip]
   }
 
   egress {
+    description = "Health checks and forwarding to targets"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [data.aws_vpc.dev.cidr_block]
   }
 
   tags = merge(local.tags, { Name = "${local.name_prefix}-alb" })

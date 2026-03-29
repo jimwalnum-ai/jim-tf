@@ -4,7 +4,7 @@
 
 resource "aws_ecr_repository" "observability_dashboard" {
   name                 = "observability-dashboard"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
@@ -242,7 +242,7 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
           }
           env {
             name  = "SQS_QUEUE_NAMES"
-            value = "SQS_FACTOR_DEV,SQS_FACTOR_RESULT_DEV,${aws_sqs_queue.factor_ts.name},${aws_sqs_queue.factor_result_ts.name}"
+            value = "SQS_FACTOR_DEV,SQS_FACTOR_RESULT_DEV,${data.aws_sqs_queue.factor_ts.name},${data.aws_sqs_queue.factor_result_ts.name}"
           }
           env {
             name  = "FACTOR_TS_NAMESPACE"

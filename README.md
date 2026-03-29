@@ -2,6 +2,20 @@
 
 This repository contains the Terraform configurations for a multi-region AWS infrastructure spanning **us-east-1** and **us-west-2**. The platform is designed to sustain **1,000 messages per second** on smaller T4 instances, keeping compute costs low while maintaining throughput.
 
+## Cloud Sandbox Constraints
+
+This infrastructure is designed to run in a **cloud sandbox environment** with limited resources and relaxed security controls. As a result:
+
+- **No TLS certificates** — HTTPS/TLS termination is not configured. Services communicate over plaintext HTTP within the VPC.
+- **No WAF or advanced firewall rules** — Web Application Firewall and fine-grained network ACLs are omitted.
+- **No secrets rotation or Vault integration** — Credentials are managed through Terraform variables and SSM Parameter Store rather than a dedicated secrets manager with automatic rotation.
+- **Self-signed or no certificates on internal endpoints** — EKS API, RDS, and inter-service traffic do not enforce certificate validation.
+- **Instance count and size are intentionally limited** — Compute is restricted to smaller instance types (e.g., `t3.medium`, `t4g.small`) and minimal node/replica counts to stay within sandbox quotas and keep costs low.
+- **No multi-AZ RDS or HA NAT gateways** — High-availability configurations are skipped to reduce resource consumption.
+- **No production-grade monitoring or alerting thresholds** — Alarms and dashboards exist but are tuned for demonstration, not production SLAs.
+
+These trade-offs are acceptable for a sandbox but should be addressed before promoting to a production environment.
+
 ## Directory Overview
 
 ### Infrastructue Root Modules
@@ -36,10 +50,11 @@ This repository contains the Terraform configurations for a multi-region AWS inf
 | Directory | Description |
 |---|---|
 | `code/` | Python scripts, Docker and GitLab CI config for factor workloads |
+| `code-ts/` | TypeScript factor workloads — parallel pipeline using separate SQS queues (`SQS_FACTOR_TS_DEV`), EKS pods, and Nomad jobs |
 | `web/` | Flask web app — built and pushed to ECR by `app/web.tf` |
 | `security-agent/` | Python security agent — deployed to EKS via `app/` and `app-west/` |
 | `security-dashboard/` | Python security dashboard — deployed to EKS via `app/` and `app-west/` |
-| `observability-dashboard/` | Infrastructure observability dashboard — monitors EKS, Nomad, SQS, RDS, CloudWatch alarms with alerting via SNS |
+| `observability-dashboard/` | Infrastructure observability dashboard — monitors EKS, Nomad, SQS, RDS, CloudWatch alarms, and TypeScript factor pods with alerting via SNS |
 | `common/` | Shared variable definitions (symlinked) |
 
 ## Deployment Order

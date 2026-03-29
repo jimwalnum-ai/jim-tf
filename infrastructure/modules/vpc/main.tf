@@ -61,22 +61,14 @@ resource "aws_network_acl" "public_acl" {
   }
 }
 
-resource "aws_network_acl_rule" "public_allow_all_inbound" {
+resource "aws_network_acl_rule" "public_inbound_internal" {
+  for_each       = local.internal_ingress_cidrs_map
   network_acl_id = aws_network_acl.public_acl.id
-  rule_number    = 1
+  rule_number    = 1 + each.value.rule_offset
   egress         = false
   protocol       = "-1"
   rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-}
-
-resource "aws_network_acl_rule" "public_allow_all_outbound" {
-  network_acl_id = aws_network_acl.public_acl.id
-  rule_number    = 1
-  egress         = true
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+  cidr_block     = each.value.cidr
 }
 
 resource "aws_network_acl" "private_acl" {
@@ -86,22 +78,15 @@ resource "aws_network_acl" "private_acl" {
   }
 }
 
-resource "aws_network_acl_rule" "private_allow_all_inbound" {
+resource "aws_network_acl_rule" "private_inbound_ephemeral_return" {
   network_acl_id = aws_network_acl.private_acl.id
-  rule_number    = 1
+  rule_number    = 200
   egress         = false
-  protocol       = "-1"
+  protocol       = "tcp"
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
-}
-
-resource "aws_network_acl_rule" "private_allow_all_outbound" {
-  network_acl_id = aws_network_acl.private_acl.id
-  rule_number    = 1
-  egress         = true
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+  from_port      = 1024
+  to_port        = 65535
 }
 
 resource "aws_network_acl_rule" "public_inbound_ssh" {
@@ -226,7 +211,6 @@ resource "aws_network_acl_rule" "private_outbound_internal" {
 }
 
 resource "aws_network_acl_rule" "private_outbound_http" {
-  count          = local.standalone ? 1 : 0
   network_acl_id = aws_network_acl.private_acl.id
   rule_number    = 500
   egress         = true
@@ -238,7 +222,6 @@ resource "aws_network_acl_rule" "private_outbound_http" {
 }
 
 resource "aws_network_acl_rule" "private_outbound_https" {
-  count          = local.standalone ? 1 : 0
   network_acl_id = aws_network_acl.private_acl.id
   rule_number    = 510
   egress         = true
@@ -250,22 +233,9 @@ resource "aws_network_acl_rule" "private_outbound_https" {
 }
 
 resource "aws_network_acl_rule" "private_outbound_ephemeral" {
-  count          = local.standalone ? 1 : 0
   network_acl_id = aws_network_acl.private_acl.id
   rule_number    = 520
   egress         = true
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 1024
-  to_port        = 65535
-}
-
-resource "aws_network_acl_rule" "private_inbound_ephemeral" {
-  count          = local.standalone ? 1 : 0
-  network_acl_id = aws_network_acl.private_acl.id
-  rule_number    = 500
-  egress         = false
   protocol       = "tcp"
   rule_action    = "allow"
   cidr_block     = "0.0.0.0/0"
