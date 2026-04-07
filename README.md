@@ -67,11 +67,12 @@ Run the Terraform root modules in the following order. Each step must complete b
    │
 2. foundation ──────────── foundation-west
    │                           │
+4. nomad (uses foundation VPC and app RDS credentials)
+   |
 3. app ─────────────────── app-west
-   │                           │
-4. global (reads state from foundation, app, and app-west)
-   │
-5. nomad (uses foundation VPC and app RDS credentials)
+   |
+5. global (reads state from foundation, app, and app-west)
+
 ```
 
 ### Step-by-step
