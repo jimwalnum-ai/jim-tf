@@ -5,7 +5,7 @@ data "aws_region" "current" {}
 variable "enable_ecs" {
   description = "Set to false to disable all ECS factor resources."
   type        = bool
-  default     = false
+  default     = true
 }
 
 locals {
