@@ -25,10 +25,11 @@ These trade-offs are acceptable for a sandbox but should be addressed before pro
 | `bootstrap/` | us-east-1 | One-time account setup: S3 state bucket, DynamoDB lock table, IAM roles, CloudTrail |
 | `foundation/` | us-east-1 | Core networking and shared infrastructure: VPC, IPAM, Route53, Network Firewall, EC2, S3/SQS |
 | `foundation-west/` | us-west-2 | West-region networking: VPC, IPAM, KMS |
+| `nomad/` | us-east-1 | HashiCorp Nomad/Consul cluster: servers, clients, ALB, jobs for factor workloads |
 | `app/` | us-east-1 | Primary application stack: EKS cluster, RDS PostgreSQL, ECR repositories, K8s workloads |
 | `app-west/` | us-west-2 | Secondary application stack: EKS cluster, VPC peering to east for cross-region RDS access |
 | `global/` | multi-region | Cross-region resources: ECR replication, Route53 health checks and DNS failover |
-| `nomad/` | us-east-1 | HashiCorp Nomad/Consul cluster: servers, clients, ALB, jobs for factor workloads |
+
 
 ### Shared Modules
 
