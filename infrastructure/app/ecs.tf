@@ -70,12 +70,6 @@ variable "ecs_test_msg_schedule" {
   default     = "rate(30 minutes)"
 }
 
-variable "web_db_name" {
-  type        = string
-  description = "Database name for the web service."
-  default     = "factors"
-}
-
 data "aws_subnets" "public_selected" {
   count = local.enable_ecs ? 1 : 0
 
