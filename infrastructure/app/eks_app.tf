@@ -40,7 +40,7 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
       }
       spec {
         container {
-          name  = "flask-app-container"
+          name              = "flask-app-container"
           image             = "${aws_ecr_repository.flask_app.repository_url}:latest"
           image_pull_policy = "Always"
           port {

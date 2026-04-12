@@ -143,7 +143,6 @@ variable "msgs_per_instance" {
 }
 
 locals {
-  name_prefix      = "nomad-${var.env}"
-  ssh_public_key   = trimspace(file("/Users/jameswalnum/.ssh/id_ed25519.pub"))
-  home_ip          = chomp(file("../../ip.txt"))
+  name_prefix = "nomad-${var.env}"
+  home_ip     = chomp(file("../../ip.txt"))
 }

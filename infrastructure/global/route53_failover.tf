@@ -37,11 +37,11 @@ data "terraform_remote_state" "app_west" {
 
 resource "aws_route53_health_check" "app_east" {
   fqdn              = data.terraform_remote_state.app_east.outputs.app_url
-  port               = 80
-  type               = "HTTP"
-  resource_path      = "/health"
-  failure_threshold  = 3
-  request_interval   = 30
+  port              = 80
+  type              = "HTTP"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
 
   tags = {
     Name = "flask-app-east-health-check"
@@ -50,11 +50,11 @@ resource "aws_route53_health_check" "app_east" {
 
 resource "aws_route53_health_check" "app_west" {
   fqdn              = data.terraform_remote_state.app_west.outputs.app_url
-  port               = 80
-  type               = "HTTP"
-  resource_path      = "/health"
-  failure_threshold  = 3
-  request_interval   = 30
+  port              = 80
+  type              = "HTTP"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
 
   tags = {
     Name = "flask-app-west-health-check"
@@ -106,11 +106,11 @@ resource "aws_route53_record" "app_west" {
 
 resource "aws_route53_health_check" "dashboard_east" {
   fqdn              = data.terraform_remote_state.app_east.outputs.security_dashboard_url_hostname
-  port               = 80
-  type               = "HTTP"
-  resource_path      = "/health"
-  failure_threshold  = 3
-  request_interval   = 30
+  port              = 80
+  type              = "HTTP"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
 
   tags = {
     Name = "security-dashboard-east-health-check"
@@ -119,11 +119,11 @@ resource "aws_route53_health_check" "dashboard_east" {
 
 resource "aws_route53_health_check" "dashboard_west" {
   fqdn              = data.terraform_remote_state.app_west.outputs.security_dashboard_url_hostname
-  port               = 80
-  type               = "HTTP"
-  resource_path      = "/health"
-  failure_threshold  = 3
-  request_interval   = 30
+  port              = 80
+  type              = "HTTP"
+  resource_path     = "/health"
+  failure_threshold = 3
+  request_interval  = 30
 
   tags = {
     Name = "security-dashboard-west-health-check"

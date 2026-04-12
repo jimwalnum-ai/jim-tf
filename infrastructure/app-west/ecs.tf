@@ -55,7 +55,7 @@ data "aws_subnets" "public_selected" {
 
 locals {
   ecs_cluster_name        = var.ecs_cluster_name != null && var.ecs_cluster_name != "" ? var.ecs_cluster_name : "ecs-factor-west-${var.env}"
-  ecs_pip_install_command  = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
+  ecs_pip_install_command = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
   process_script_b64      = base64encode(file("${path.module}/../code/process.py"))
   persist_script_b64      = base64encode(file("${path.module}/../code/persist.py"))
   test_msg_script_b64     = base64encode(file("${path.module}/../code/test_msg.py"))
