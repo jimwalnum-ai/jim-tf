@@ -61,6 +61,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
+        # Role provisioned by infrastructure/bootstrap/iam_github_oidc.tf
+        # Set secret AWS_OIDC_ROLE_ARN = `terraform output github_actions_role_arn`
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
