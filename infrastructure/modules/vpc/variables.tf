@@ -48,13 +48,13 @@ variable "endpoint_list" {
     # EKS control plane & node registration
     "eks",
     "ec2",
-    "autoscaling",      # cluster-autoscaler SetDesiredCapacity / DescribeAutoScalingGroups
+    "autoscaling",          # cluster-autoscaler SetDesiredCapacity / DescribeAutoScalingGroups
     "elasticloadbalancing", # k8s LoadBalancer Service provisioning
     # Identity & secrets
     "sts",
     "kms", # EBS encryption on all node groups
     # Observability
-    "logs",      # CloudWatch Logs
+    "logs",       # CloudWatch Logs
     "monitoring", # CloudWatch Metrics (node-exporter, EKS control-plane metrics)
     # Messaging
     "sqs",
