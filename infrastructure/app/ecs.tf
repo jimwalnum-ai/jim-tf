@@ -31,19 +31,19 @@ variable "ecs_process_memory" {
 variable "ecs_process_desired_count" {
   type        = number
   description = "Desired number of process tasks."
-  default     = 2
+  default     = 1
 }
 
 variable "ecs_persist_desired_count" {
   type        = number
   description = "Desired number of persist tasks."
-  default     = 2
+  default     = 1
 }
 
 variable "ecs_autoscaling_max" {
   type        = number
   description = "Maximum number of tasks for autoscaling."
-  default     = 6
+  default     = 1
 }
 
 variable "ecs_assign_public_ip" {

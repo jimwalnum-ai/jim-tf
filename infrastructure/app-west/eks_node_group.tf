@@ -12,8 +12,8 @@ module "eks_node_group" {
   ami_type       = "AL2023_ARM_64_STANDARD"
   instance_types = ["t4g.medium"]
   min_size       = 1
-  max_size       = 5
-  desired_size   = 2
+  max_size       = 1
+  desired_size   = 1
 
   iam_role_additional_policies = {
     ecr_scoped_pull = aws_iam_policy.eks_ecr_pull.arn
