@@ -1,5 +1,5 @@
 locals {
-  web_src_dir  = "${path.module}/../web"
+  web_src_dir = "${path.module}/../web"
   web_src_hash = sha256(join("", [
     filesha256("${local.web_src_dir}/Dockerfile"),
     filesha256("${local.web_src_dir}/server.py"),
