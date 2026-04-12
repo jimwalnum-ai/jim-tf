@@ -1,6 +1,6 @@
 # Terraform Infrastructure
 
-This repository contains the Terraform configurations for a multi-region AWS infrastructure spanning **us-east-1** and **us-west-2**. The platform is designed to sustain **1,000 messages per second** on smaller T4 instances, keeping compute costs low while maintaining throughput.
+This repository contains the Terraform configurations for a multi-region AWS infrastructure spanning **us-east-1** and **us-west-2**. The platform is purpose-built to support **high-throughput data pipeline and ML inference workloads** — sustaining 1,000 messages per second on cost-optimized instances while maintaining data sovereignty through private networking (AWS Network Firewall, Transit Gateway inspection routing, and VPC-contained traffic). Security and compliance controls (CloudTrail, IAM least-privilege, KMS encryption) are first-class, not afterthoughts.
 
 ## Cloud Sandbox Constraints
 
@@ -18,7 +18,7 @@ These trade-offs are acceptable for a sandbox but should be addressed before pro
 
 ## Directory Overview
 
-### Infrastructue Root Modules
+### Infrastructure Root Modules
 
 | Directory | Region | Description |
 |---|---|---|

@@ -50,3 +50,9 @@ wandb/
 
 # Large data files
 data/cifar-10-python.tar.gz
+
+# macOS
+.DS_Store
+
+# Editor backup files
+*.save
