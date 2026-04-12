@@ -18,10 +18,6 @@ data "aws_ami" "al2023" {
   }
 }
 
-locals {
-  ssh_public_key = trimspace(file("/Users/jameswalnum/.ssh/id_ed25519.pub"))
-}
-
 resource "aws_instance" "ec2_public_instance_1" {
   ami                         = data.aws_ami.al2023.id
   subnet_id                   = module.vpc["dev"].public_subnets[0]
@@ -32,8 +28,17 @@ resource "aws_instance" "ec2_public_instance_1" {
   depends_on                  = [module.vpc["dev"]]
   user_data = <<-EOF
     #!/bin/bash
+    TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+    REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+      http://169.254.169.254/latest/meta-data/placement/region)
+    SSH_PUB_KEY=$(aws secretsmanager get-secret-value \
+      --secret-id cs/ec2/ssh-public-key \
+      --query SecretString \
+      --output text \
+      --region "$REGION")
     install -d -m 700 /home/ec2-user/.ssh
-    echo "${local.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
+    echo "$SSH_PUB_KEY" > /home/ec2-user/.ssh/authorized_keys
     chown -R ec2-user:ec2-user /home/ec2-user/.ssh
     chmod 600 /home/ec2-user/.ssh/authorized_keys
 
@@ -125,8 +130,17 @@ resource "aws_instance" "gitlab" {
   depends_on             = [module.vpc["dev"]]
   user_data = <<-EOF
     #!/bin/bash
+    TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+    REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+      http://169.254.169.254/latest/meta-data/placement/region)
+    SSH_PUB_KEY=$(aws secretsmanager get-secret-value \
+      --secret-id cs/ec2/ssh-public-key \
+      --query SecretString \
+      --output text \
+      --region "$REGION")
     install -d -m 700 /home/ec2-user/.ssh
-    echo "${local.ssh_public_key}" > /home/ec2-user/.ssh/authorized_keys
+    echo "$SSH_PUB_KEY" > /home/ec2-user/.ssh/authorized_keys
     chown -R ec2-user:ec2-user /home/ec2-user/.ssh
     chmod 600 /home/ec2-user/.ssh/authorized_keys
 
@@ -229,6 +243,20 @@ resource "aws_iam_role" "ec2_workload" {
 resource "aws_iam_role_policy_attachment" "ec2_workload_ssm" {
   role       = aws_iam_role.ec2_workload.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_role_policy" "ec2_workload_secrets" {
+  name = "ec2-ssh-key-secret-read"
+  role = aws_iam_role.ec2_workload.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = aws_secretsmanager_secret.ssh_public_key.arn
+    }]
+  })
 }
 
 resource "aws_iam_instance_profile" "private" {
