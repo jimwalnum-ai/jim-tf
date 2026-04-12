@@ -22,7 +22,7 @@ data "aws_subnets" "public_selected" {
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csx3"
+  prefix            = "csx2"
   ecs_cluster_name  = "ecs-factor-mt"
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }

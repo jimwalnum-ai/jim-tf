@@ -10,7 +10,7 @@ variable "enable_ecs" {
 
 locals {
   state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csx3"
+  prefix            = "csx2"
   enable_ecs        = var.enable_ecs
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }
