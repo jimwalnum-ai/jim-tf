@@ -1,0 +1,87 @@
+name: Build & Push to ECR
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "infrastructure/web/**"
+      - "infrastructure/code/**"
+      - "infrastructure/security-agent/**"
+      - "infrastructure/security-dashboard/**"
+      - "infrastructure/observability-dashboard/**"
+      - ".github/workflows/docker-build-push.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "infrastructure/web/**"
+      - "infrastructure/code/**"
+      - "infrastructure/security-agent/**"
+      - "infrastructure/security-dashboard/**"
+      - "infrastructure/observability-dashboard/**"
+      - ".github/workflows/docker-build-push.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  build-push:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: flask-app
+            context: infrastructure/web
+            dockerfile: infrastructure/web/Dockerfile
+
+          - image: factor-worker
+            context: infrastructure/code
+            dockerfile: infrastructure/code/docker/Dockerfile
+
+          - image: cilium-security-agent
+            context: infrastructure/security-agent
+            dockerfile: infrastructure/security-agent/Dockerfile
+
+          - image: cilium-security-dashboard
+            context: infrastructure/security-dashboard
+            dockerfile: infrastructure/security-dashboard/Dockerfile
+
+          - image: observability-dashboard
+            context: infrastructure/observability-dashboard
+            dockerfile: infrastructure/observability-dashboard/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ matrix.image }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: false
