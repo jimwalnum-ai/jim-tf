@@ -2,7 +2,6 @@ resource "aws_launch_template" "client" {
   name_prefix   = "${local.name_prefix}-client-"
   image_id      = data.aws_ami.al2023_arm.id
   instance_type = var.client_instance_type
-  key_name      = aws_key_pair.nomad.key_name
 
   iam_instance_profile {
     name = aws_iam_instance_profile.nomad_node.name
