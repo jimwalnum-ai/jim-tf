@@ -211,9 +211,6 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
         labels = {
           app = "observability-dashboard"
         }
-        annotations = {
-          "src-hash" = local.obs_src_hash
-        }
       }
 
       spec {
@@ -302,7 +299,6 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
     kubernetes_service_account_v1.observability_dashboard,
     kubernetes_cluster_role_binding_v1.observability_reader,
     aws_iam_role_policy_attachment.observability_dashboard,
-    terraform_data.observability_dashboard_image,
   ]
 }
 
@@ -331,50 +327,6 @@ resource "kubernetes_service_v1" "observability_dashboard" {
   }
 
   depends_on = [kubernetes_namespace_v1.observability]
-}
-
-################################################################################
-# Build & Push Dashboard Image
-################################################################################
-
-locals {
-  obs_src_dir = "${path.module}/../observability-dashboard"
-  obs_src_hash = sha256(join("", [
-    filesha256("${local.obs_src_dir}/Dockerfile"),
-    filesha256("${local.obs_src_dir}/app.py"),
-    filesha256("${local.obs_src_dir}/requirements.txt"),
-    filesha256("${local.obs_src_dir}/static/style.css"),
-    filesha256("${local.obs_src_dir}/templates/index.html"),
-  ]))
-}
-
-resource "terraform_data" "observability_dashboard_image" {
-  triggers_replace = [local.obs_src_hash]
-
-  provisioner "local-exec" {
-    working_dir = local.obs_src_dir
-    interpreter = ["bash", "-c"]
-    command     = <<-EOT
-      set -e
-      export DOCKER_CONFIG=$(mktemp -d)
-      trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-      TOKEN=$(aws ecr get-login-password --region ${data.aws_region.current.id})
-      AUTH=$(printf 'AWS:%s' "$TOKEN" | base64)
-      printf '{"auths":{"%s":{"auth":"%s"}}}' \
-        "${aws_ecr_repository.observability_dashboard.repository_url}" "$AUTH" \
-        > "$DOCKER_CONFIG/config.json"
-      for attempt in 1 2 3; do
-        if docker buildx build --platform linux/arm64 \
-          -t ${aws_ecr_repository.observability_dashboard.repository_url}:latest \
-          --push .; then
-          exit 0
-        fi
-        echo "Build attempt $attempt failed; retrying in 15s..." >&2
-        sleep 15
-      done
-      exit 1
-    EOT
-  }
 }
 
 ################################################################################
