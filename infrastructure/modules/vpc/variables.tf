@@ -40,8 +40,29 @@ variable "test" {
 
 variable "endpoint_list" {
   type        = list(string)
-  description = "List of VPC endpoints to create, s3 endpoint is automatic (opt)"
-  default     = ["ecr.api", "ecr.dkr", "logs", "ec2", "sts", "eks", "sqs", "ssm", "ssmmessages", "ec2messages"]
+  description = "List of VPC endpoints to create, s3 and dynamodb gateway endpoints are automatic (opt)"
+  default = [
+    # Container image pulls
+    "ecr.api",
+    "ecr.dkr",
+    # EKS control plane & node registration
+    "eks",
+    "ec2",
+    "autoscaling",      # cluster-autoscaler SetDesiredCapacity / DescribeAutoScalingGroups
+    "elasticloadbalancing", # k8s LoadBalancer Service provisioning
+    # Identity & secrets
+    "sts",
+    "kms", # EBS encryption on all node groups
+    # Observability
+    "logs",      # CloudWatch Logs
+    "monitoring", # CloudWatch Metrics (node-exporter, EKS control-plane metrics)
+    # Messaging
+    "sqs",
+    # Node management (SSM Session Manager + Hybrid Nodes)
+    "ssm",
+    "ssmmessages",
+    "ec2messages",
+  ]
 }
 
 variable "endpoint_subnet_ids" {

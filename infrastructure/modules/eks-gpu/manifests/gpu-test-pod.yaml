@@ -1,0 +1,41 @@
+# Sample GPU workload pod
+#
+# Validates end-to-end GPU scheduling:
+#   1. The toleration allows the pod to land on the nvidia.com/gpu=true:NoSchedule tainted node.
+#   2. The resource limit requests exactly one GPU slice from the NVIDIA device plugin.
+#   3. nvidia-smi prints device details and exits — restartPolicy: Never keeps it from looping.
+#
+# Apply:
+#   kubectl apply -f modules/eks-gpu/manifests/gpu-test-pod.yaml
+#
+# Verify:
+#   kubectl logs gpu-test          # expect nvidia-smi output with GPU details
+#   kubectl get pod gpu-test       # expect Completed
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-test
+  namespace: default
+  labels:
+    app: gpu-test
+spec:
+  restartPolicy: Never
+
+  # Must tolerate the nvidia.com/gpu=true:NoSchedule taint set on GPU nodes.
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+  containers:
+    - name: cuda-smi
+      # Public CUDA image — swap for your own CUDA workload image in production.
+      image: nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+      command: ["nvidia-smi"]
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+        requests:
+          nvidia.com/gpu: "1"

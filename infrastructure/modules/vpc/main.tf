@@ -407,13 +407,24 @@ resource "aws_network_acl_association" "public_sub_assoc" {
 # VPC Endpoints
 ###############
 
-# Always want s3 endpoint, Gateway endpoint
+# Gateway endpoints — free, no ENI, no security group needed.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.vpc.id
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
   tags = {
     Name = "${local.env_name}-s3-gateway"
+  }
+}
+
+# DynamoDB Gateway endpoint — keeps Terraform state-lock traffic off the internet
+# and avoids NAT charges for DynamoDB calls (used by bootstrap and every tf apply).
+resource "aws_vpc_endpoint" "dynamodb" {
+  vpc_id            = aws_vpc.vpc.id
+  service_name      = "com.amazonaws.${var.region}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  tags = {
+    Name = "${local.env_name}-dynamodb-gateway"
   }
 }
 

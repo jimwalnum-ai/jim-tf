@@ -74,11 +74,11 @@ data "aws_iam_policy_document" "ecr_push" {
       "ecr:PutImage",
     ]
     resources = [
-      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${local.acct_id}:repository/flask-app",
-      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${local.acct_id}:repository/factor-worker",
-      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${local.acct_id}:repository/cilium-security-agent",
-      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${local.acct_id}:repository/cilium-security-dashboard",
-      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.name}:${local.acct_id}:repository/observability-dashboard",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/flask-app",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/factor-worker",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/cilium-security-agent",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/cilium-security-dashboard",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/observability-dashboard",
     ]
   }
 }
