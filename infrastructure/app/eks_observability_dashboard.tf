@@ -3,6 +3,7 @@
 ################################################################################
 
 resource "aws_ecr_repository" "observability_dashboard" {
+  count                = local.enable_eks || local.enable_ecs_web ? 1 : 0
   name                 = "observability-dashboard"
   image_tag_mutability = "IMMUTABLE"
 
@@ -14,7 +15,8 @@ resource "aws_ecr_repository" "observability_dashboard" {
 }
 
 resource "aws_ecr_lifecycle_policy" "observability_dashboard" {
-  repository = aws_ecr_repository.observability_dashboard.name
+  count      = local.enable_eks || local.enable_ecs_web ? 1 : 0
+  repository = aws_ecr_repository.observability_dashboard[0].name
 
   policy = jsonencode({
     rules = [
@@ -37,6 +39,7 @@ resource "aws_ecr_lifecycle_policy" "observability_dashboard" {
 ################################################################################
 
 data "terraform_remote_state" "nomad" {
+  count   = local.enable_nomad ? 1 : 0
   backend = "s3"
   config = {
     bucket = local.state_bucket_name
@@ -55,7 +58,8 @@ locals {
 }
 
 resource "aws_iam_policy" "observability_dashboard" {
-  name        = "${module.eks_cluster.cluster_name}-observability-dashboard"
+  count       = local.enable_eks ? 1 : 0
+  name        = "${module.eks_cluster[0].cluster_name}-observability-dashboard"
   description = "Allow the observability dashboard to read AWS resource status"
 
   policy = jsonencode({
@@ -93,7 +97,7 @@ resource "aws_iam_policy" "observability_dashboard" {
         Action = [
           "sns:Publish",
         ]
-        Resource = [aws_sns_topic.security_alerts.arn]
+        Resource = [aws_sns_topic.security_alerts[0].arn]
       }
     ]
   })
@@ -102,7 +106,8 @@ resource "aws_iam_policy" "observability_dashboard" {
 }
 
 resource "aws_iam_role" "observability_dashboard" {
-  name = "${module.eks_cluster.cluster_name}-observability-dashboard"
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-observability-dashboard"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -110,13 +115,13 @@ resource "aws_iam_role" "observability_dashboard" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = module.eks_cluster.oidc_provider_arn
+          Federated = module.eks_cluster[0].oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
-            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.obs_namespace}:${local.obs_sa_name}"
+            "${module.eks_cluster[0].oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster[0].oidc_provider}:sub" = "system:serviceaccount:${local.obs_namespace}:${local.obs_sa_name}"
           }
         }
       }
@@ -127,8 +132,9 @@ resource "aws_iam_role" "observability_dashboard" {
 }
 
 resource "aws_iam_role_policy_attachment" "observability_dashboard" {
-  role       = aws_iam_role.observability_dashboard.name
-  policy_arn = aws_iam_policy.observability_dashboard.arn
+  count      = local.enable_eks ? 1 : 0
+  role       = aws_iam_role.observability_dashboard[0].name
+  policy_arn = aws_iam_policy.observability_dashboard[0].arn
 }
 
 ################################################################################
@@ -136,6 +142,8 @@ resource "aws_iam_role_policy_attachment" "observability_dashboard" {
 ################################################################################
 
 resource "kubernetes_namespace_v1" "observability" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = local.obs_namespace
   }
@@ -144,11 +152,13 @@ resource "kubernetes_namespace_v1" "observability" {
 }
 
 resource "kubernetes_service_account_v1" "observability_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = local.obs_sa_name
     namespace = local.obs_namespace
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.observability_dashboard.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.observability_dashboard[0].arn
     }
   }
 
@@ -156,6 +166,8 @@ resource "kubernetes_service_account_v1" "observability_dashboard" {
 }
 
 resource "kubernetes_cluster_role_v1" "observability_reader" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = "observability-reader"
   }
@@ -174,6 +186,8 @@ resource "kubernetes_cluster_role_v1" "observability_reader" {
 }
 
 resource "kubernetes_cluster_role_binding_v1" "observability_reader" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = "observability-reader"
   }
@@ -181,7 +195,7 @@ resource "kubernetes_cluster_role_binding_v1" "observability_reader" {
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
-    name      = kubernetes_cluster_role_v1.observability_reader.metadata[0].name
+    name      = kubernetes_cluster_role_v1.observability_reader[0].metadata[0].name
   }
 
   subject {
@@ -192,10 +206,14 @@ resource "kubernetes_cluster_role_binding_v1" "observability_reader" {
 }
 
 resource "kubernetes_deployment_v1" "observability_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "observability-dashboard"
     namespace = local.obs_namespace
   }
+
+  wait_for_rollout = false
 
   spec {
     replicas = 1
@@ -218,7 +236,7 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
 
         container {
           name              = "dashboard"
-          image             = "${aws_ecr_repository.observability_dashboard.repository_url}:latest"
+          image             = "${aws_ecr_repository.observability_dashboard[0].repository_url}:latest"
           image_pull_policy = "Always"
 
           port {
@@ -231,11 +249,11 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
           }
           env {
             name  = "CLUSTER_NAME"
-            value = module.eks_cluster.cluster_name
+            value = module.eks_cluster[0].cluster_name
           }
           env {
             name  = "NOMAD_ADDR"
-            value = "http://${try(data.terraform_remote_state.nomad.outputs.alb_dns_name, "")}:4646"
+            value = "http://${try(data.terraform_remote_state.nomad[0].outputs.alb_dns_name, "")}:4646"
           }
           env {
             name  = "SQS_QUEUE_NAMES"
@@ -251,7 +269,7 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
           }
           env {
             name  = "SNS_TOPIC_ARN"
-            value = aws_sns_topic.security_alerts.arn
+            value = aws_sns_topic.security_alerts[0].arn
           }
           env {
             name  = "NOMAD_IGNORED_DEAD_JOBS"
@@ -303,6 +321,8 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
 }
 
 resource "kubernetes_service_v1" "observability_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "observability-dashboard"
     namespace = local.obs_namespace
@@ -334,11 +354,11 @@ resource "kubernetes_service_v1" "observability_dashboard" {
 ################################################################################
 
 output "observability_dashboard_ecr_url" {
-  value       = aws_ecr_repository.observability_dashboard.repository_url
+  value       = local.enable_eks || local.enable_ecs_web ? aws_ecr_repository.observability_dashboard[0].repository_url : "(disabled)"
   description = "ECR repository URL for the observability dashboard image"
 }
 
 output "observability_dashboard_url" {
-  value       = try("http://${kubernetes_service_v1.observability_dashboard.status[0].load_balancer[0].ingress[0].hostname}", "(pending)")
+  value       = local.enable_eks ? try("http://${kubernetes_service_v1.observability_dashboard[0].status[0].load_balancer[0].ingress[0].hostname}", "(pending)") : (local.enable_ecs_web ? "http://${aws_lb.obs_dashboard[0].dns_name}" : "(disabled)")
   description = "URL to access the observability dashboard"
 }

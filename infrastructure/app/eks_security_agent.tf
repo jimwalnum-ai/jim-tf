@@ -3,6 +3,7 @@
 ################################################################################
 
 resource "aws_ecr_repository" "security_agent" {
+  count                = local.enable_eks ? 1 : 0
   name                 = "cilium-security-agent"
   image_tag_mutability = "IMMUTABLE"
 
@@ -14,7 +15,8 @@ resource "aws_ecr_repository" "security_agent" {
 }
 
 resource "aws_ecr_lifecycle_policy" "security_agent" {
-  repository = aws_ecr_repository.security_agent.name
+  count      = local.enable_eks ? 1 : 0
+  repository = aws_ecr_repository.security_agent[0].name
 
   policy = jsonencode({
     rules = [
@@ -37,8 +39,19 @@ resource "aws_ecr_lifecycle_policy" "security_agent" {
 ################################################################################
 
 resource "aws_sns_topic" "security_alerts" {
-  name = "${module.eks_cluster.cluster_name}-cilium-security-alerts"
-  tags = local.tags
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-cilium-security-alerts"
+  tags  = local.tags
+}
+
+resource "aws_sns_topic" "security_alerts_ecs" {
+  count = local.enable_ecs_web ? 1 : 0
+  name  = "${local.ecs_cluster_name}-security-alerts"
+  tags  = local.tags
+}
+
+locals {
+  security_alerts_topic_arn = local.enable_eks ? aws_sns_topic.security_alerts[0].arn : (local.enable_ecs_web ? aws_sns_topic.security_alerts_ecs[0].arn : "")
 }
 
 variable "security_alert_email" {
@@ -48,8 +61,15 @@ variable "security_alert_email" {
 }
 
 resource "aws_sns_topic_subscription" "security_email" {
-  count     = var.security_alert_email != "" ? 1 : 0
-  topic_arn = aws_sns_topic.security_alerts.arn
+  count     = local.enable_eks && var.security_alert_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.security_alerts[0].arn
+  protocol  = "email"
+  endpoint  = var.security_alert_email
+}
+
+resource "aws_sns_topic_subscription" "security_email_ecs" {
+  count     = local.enable_ecs_web && var.security_alert_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.security_alerts_ecs[0].arn
   protocol  = "email"
   endpoint  = var.security_alert_email
 }
@@ -64,7 +84,8 @@ locals {
 }
 
 resource "aws_iam_policy" "security_agent" {
-  name        = "${module.eks_cluster.cluster_name}-cilium-security-agent"
+  count       = local.enable_eks ? 1 : 0
+  name        = "${module.eks_cluster[0].cluster_name}-cilium-security-agent"
   description = "Allow the Cilium security agent to read Hubble logs from S3, invoke Bedrock, and publish to SNS"
 
   policy = jsonencode({
@@ -79,8 +100,8 @@ resource "aws_iam_policy" "security_agent" {
           "s3:ListBucket",
         ]
         Resource = [
-          module.hubble_logs_bucket.bucket_arn,
-          "${module.hubble_logs_bucket.bucket_arn}/*",
+          module.hubble_logs_bucket[0].bucket_arn,
+          "${module.hubble_logs_bucket[0].bucket_arn}/*",
         ]
       },
       {
@@ -99,7 +120,7 @@ resource "aws_iam_policy" "security_agent" {
         Action = [
           "sns:Publish",
         ]
-        Resource = [aws_sns_topic.security_alerts.arn]
+        Resource = [aws_sns_topic.security_alerts[0].arn]
       }
     ]
   })
@@ -108,7 +129,8 @@ resource "aws_iam_policy" "security_agent" {
 }
 
 resource "aws_iam_role" "security_agent" {
-  name = "${module.eks_cluster.cluster_name}-cilium-security-agent"
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-cilium-security-agent"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -116,13 +138,13 @@ resource "aws_iam_role" "security_agent" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = module.eks_cluster.oidc_provider_arn
+          Federated = module.eks_cluster[0].oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
-            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.security_agent_namespace}:${local.security_agent_sa_name}"
+            "${module.eks_cluster[0].oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster[0].oidc_provider}:sub" = "system:serviceaccount:${local.security_agent_namespace}:${local.security_agent_sa_name}"
           }
         }
       }
@@ -133,8 +155,9 @@ resource "aws_iam_role" "security_agent" {
 }
 
 resource "aws_iam_role_policy_attachment" "security_agent" {
-  role       = aws_iam_role.security_agent.name
-  policy_arn = aws_iam_policy.security_agent.arn
+  count      = local.enable_eks ? 1 : 0
+  role       = aws_iam_role.security_agent[0].name
+  policy_arn = aws_iam_policy.security_agent[0].arn
 }
 
 ################################################################################
@@ -142,6 +165,8 @@ resource "aws_iam_role_policy_attachment" "security_agent" {
 ################################################################################
 
 resource "kubernetes_namespace_v1" "security" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = local.security_agent_namespace
   }
@@ -150,6 +175,8 @@ resource "kubernetes_namespace_v1" "security" {
 }
 
 resource "kubernetes_cron_job_v1" "security_agent" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "cilium-security-agent"
     namespace = local.security_agent_namespace
@@ -178,12 +205,12 @@ resource "kubernetes_cron_job_v1" "security_agent" {
 
             container {
               name              = "agent"
-              image             = "${aws_ecr_repository.security_agent.repository_url}:latest"
+              image             = "${aws_ecr_repository.security_agent[0].repository_url}:latest"
               image_pull_policy = "Always"
 
               env {
                 name  = "S3_BUCKET"
-                value = module.hubble_logs_bucket.bucket_name
+                value = module.hubble_logs_bucket[0].bucket_name
               }
               env {
                 name  = "S3_PREFIX"
@@ -195,7 +222,7 @@ resource "kubernetes_cron_job_v1" "security_agent" {
               }
               env {
                 name  = "SNS_TOPIC_ARN"
-                value = aws_sns_topic.security_alerts.arn
+                value = aws_sns_topic.security_alerts[0].arn
               }
               env {
                 name  = "BEDROCK_MODEL_ID"
@@ -203,7 +230,7 @@ resource "kubernetes_cron_job_v1" "security_agent" {
               }
               env {
                 name  = "CLUSTER_NAME"
-                value = module.eks_cluster.cluster_name
+                value = module.eks_cluster[0].cluster_name
               }
               env {
                 name  = "LOOKBACK_MINUTES"
@@ -238,11 +265,13 @@ resource "kubernetes_cron_job_v1" "security_agent" {
 }
 
 resource "kubernetes_service_account_v1" "security_agent" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = local.security_agent_sa_name
     namespace = local.security_agent_namespace
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.security_agent.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.security_agent[0].arn
     }
   }
 
@@ -254,11 +283,11 @@ resource "kubernetes_service_account_v1" "security_agent" {
 ################################################################################
 
 output "security_agent_ecr_url" {
-  value       = aws_ecr_repository.security_agent.repository_url
+  value       = local.enable_eks ? aws_ecr_repository.security_agent[0].repository_url : "(EKS disabled)"
   description = "ECR repository URL for the Cilium security agent image"
 }
 
 output "security_alerts_topic_arn" {
-  value       = aws_sns_topic.security_alerts.arn
-  description = "SNS topic ARN for Cilium security alerts"
+  value       = local.security_alerts_topic_arn != "" ? local.security_alerts_topic_arn : "(disabled)"
+  description = "SNS topic ARN for security alerts"
 }

@@ -3,6 +3,7 @@
 ################################################################################
 
 module "hubble_logs_bucket" {
+  count  = local.enable_eks || local.enable_ecs_web ? 1 : 0
   source = "../modules/s3"
 
   bucket_name     = "${local.prefix}-hubble-flow-logs"
@@ -20,7 +21,8 @@ locals {
 }
 
 resource "aws_iam_policy" "fluent_bit_s3" {
-  name        = "${module.eks_cluster.cluster_name}-fluent-bit-s3"
+  count       = local.enable_eks ? 1 : 0
+  name        = "${module.eks_cluster[0].cluster_name}-fluent-bit-s3"
   description = "Allow Fluent Bit to write Hubble flow logs to S3"
 
   policy = jsonencode({
@@ -35,8 +37,8 @@ resource "aws_iam_policy" "fluent_bit_s3" {
           "s3:ListBucket",
         ]
         Resource = [
-          module.hubble_logs_bucket.bucket_arn,
-          "${module.hubble_logs_bucket.bucket_arn}/*",
+          module.hubble_logs_bucket[0].bucket_arn,
+          "${module.hubble_logs_bucket[0].bucket_arn}/*",
         ]
       }
     ]
@@ -46,7 +48,8 @@ resource "aws_iam_policy" "fluent_bit_s3" {
 }
 
 resource "aws_iam_role" "fluent_bit" {
-  name = "${module.eks_cluster.cluster_name}-fluent-bit"
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-fluent-bit"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -54,13 +57,13 @@ resource "aws_iam_role" "fluent_bit" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = module.eks_cluster.oidc_provider_arn
+          Federated = module.eks_cluster[0].oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
-            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.fluent_bit_namespace}:${local.fluent_bit_sa_name}"
+            "${module.eks_cluster[0].oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster[0].oidc_provider}:sub" = "system:serviceaccount:${local.fluent_bit_namespace}:${local.fluent_bit_sa_name}"
           }
         }
       }
@@ -71,8 +74,9 @@ resource "aws_iam_role" "fluent_bit" {
 }
 
 resource "aws_iam_role_policy_attachment" "fluent_bit_s3" {
-  role       = aws_iam_role.fluent_bit.name
-  policy_arn = aws_iam_policy.fluent_bit_s3.arn
+  count      = local.enable_eks ? 1 : 0
+  role       = aws_iam_role.fluent_bit[0].name
+  policy_arn = aws_iam_policy.fluent_bit_s3[0].arn
 }
 
 ################################################################################
@@ -80,6 +84,8 @@ resource "aws_iam_role_policy_attachment" "fluent_bit_s3" {
 ################################################################################
 
 resource "kubernetes_namespace" "fluent_bit" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = local.fluent_bit_namespace
   }
@@ -92,6 +98,7 @@ resource "kubernetes_namespace" "fluent_bit" {
 ################################################################################
 
 resource "helm_release" "fluent_bit" {
+  count      = local.enable_eks ? 1 : 0
   name       = "fluent-bit"
   repository = "https://fluent.github.io/helm-charts"
   chart      = "fluent-bit"
@@ -105,7 +112,7 @@ resource "helm_release" "fluent_bit" {
       create: true
       name: "${local.fluent_bit_sa_name}"
       annotations:
-        eks.amazonaws.com/role-arn: "${aws_iam_role.fluent_bit.arn}"
+        eks.amazonaws.com/role-arn: "${aws_iam_role.fluent_bit[0].arn}"
 
     config:
       service: |
@@ -132,7 +139,7 @@ resource "helm_release" "fluent_bit" {
         [OUTPUT]
             Name                         s3
             Match                        hubble.*
-            bucket                       ${module.hubble_logs_bucket.bucket_name}
+            bucket                       ${module.hubble_logs_bucket[0].bucket_name}
             region                       ${data.aws_region.current.id}
             total_file_size              50M
             upload_timeout               10m
@@ -144,7 +151,7 @@ resource "helm_release" "fluent_bit" {
         [FILTER]
             Name   modify
             Match  hubble.*
-            Add    cluster ${module.eks_cluster.cluster_name}
+            Add    cluster ${module.eks_cluster[0].cluster_name}
 
     extraVolumeMounts:
       - name: cilium-hubble

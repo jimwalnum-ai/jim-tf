@@ -3,6 +3,7 @@
 ################################################################################
 
 resource "aws_ecr_repository" "security_dashboard" {
+  count                = local.enable_eks || local.enable_ecs_web ? 1 : 0
   name                 = "cilium-security-dashboard"
   image_tag_mutability = "IMMUTABLE"
 
@@ -14,7 +15,8 @@ resource "aws_ecr_repository" "security_dashboard" {
 }
 
 resource "aws_ecr_lifecycle_policy" "security_dashboard" {
-  repository = aws_ecr_repository.security_dashboard.name
+  count      = local.enable_eks || local.enable_ecs_web ? 1 : 0
+  repository = aws_ecr_repository.security_dashboard[0].name
 
   policy = jsonencode({
     rules = [
@@ -42,7 +44,8 @@ locals {
 }
 
 resource "aws_iam_policy" "security_dashboard" {
-  name        = "${module.eks_cluster.cluster_name}-security-dashboard"
+  count       = local.enable_eks ? 1 : 0
+  name        = "${module.eks_cluster[0].cluster_name}-security-dashboard"
   description = "Allow the security dashboard to read reports and flow logs from S3"
 
   policy = jsonencode({
@@ -56,8 +59,8 @@ resource "aws_iam_policy" "security_dashboard" {
           "s3:ListBucket",
         ]
         Resource = [
-          module.hubble_logs_bucket.bucket_arn,
-          "${module.hubble_logs_bucket.bucket_arn}/*",
+          module.hubble_logs_bucket[0].bucket_arn,
+          "${module.hubble_logs_bucket[0].bucket_arn}/*",
         ]
       }
     ]
@@ -67,7 +70,8 @@ resource "aws_iam_policy" "security_dashboard" {
 }
 
 resource "aws_iam_role" "security_dashboard" {
-  name = "${module.eks_cluster.cluster_name}-security-dashboard"
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-security-dashboard"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -75,13 +79,13 @@ resource "aws_iam_role" "security_dashboard" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = module.eks_cluster.oidc_provider_arn
+          Federated = module.eks_cluster[0].oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
-            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.dashboard_namespace}:${local.dashboard_sa_name}"
+            "${module.eks_cluster[0].oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster[0].oidc_provider}:sub" = "system:serviceaccount:${local.dashboard_namespace}:${local.dashboard_sa_name}"
           }
         }
       }
@@ -92,8 +96,9 @@ resource "aws_iam_role" "security_dashboard" {
 }
 
 resource "aws_iam_role_policy_attachment" "security_dashboard" {
-  role       = aws_iam_role.security_dashboard.name
-  policy_arn = aws_iam_policy.security_dashboard.arn
+  count      = local.enable_eks ? 1 : 0
+  role       = aws_iam_role.security_dashboard[0].name
+  policy_arn = aws_iam_policy.security_dashboard[0].arn
 }
 
 ################################################################################
@@ -101,11 +106,13 @@ resource "aws_iam_role_policy_attachment" "security_dashboard" {
 ################################################################################
 
 resource "kubernetes_service_account_v1" "security_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = local.dashboard_sa_name
     namespace = local.dashboard_namespace
     annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.security_dashboard.arn
+      "eks.amazonaws.com/role-arn" = aws_iam_role.security_dashboard[0].arn
     }
   }
 
@@ -113,10 +120,14 @@ resource "kubernetes_service_account_v1" "security_dashboard" {
 }
 
 resource "kubernetes_deployment_v1" "security_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "cilium-security-dashboard"
     namespace = local.dashboard_namespace
   }
+
+  wait_for_rollout = false
 
   spec {
     replicas = 1
@@ -139,7 +150,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
 
         container {
           name              = "dashboard"
-          image             = "${aws_ecr_repository.security_dashboard.repository_url}:latest"
+          image             = "${aws_ecr_repository.security_dashboard[0].repository_url}:latest"
           image_pull_policy = "Always"
 
           port {
@@ -148,7 +159,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
 
           env {
             name  = "S3_BUCKET"
-            value = module.hubble_logs_bucket.bucket_name
+            value = module.hubble_logs_bucket[0].bucket_name
           }
           env {
             name  = "REPORTS_PREFIX"
@@ -160,7 +171,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
           }
           env {
             name  = "CLUSTER_NAME"
-            value = module.eks_cluster.cluster_name
+            value = module.eks_cluster[0].cluster_name
           }
 
           resources {
@@ -205,6 +216,8 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
 }
 
 resource "kubernetes_service_v1" "security_dashboard" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "cilium-security-dashboard"
     namespace = local.dashboard_namespace
@@ -236,16 +249,16 @@ resource "kubernetes_service_v1" "security_dashboard" {
 ################################################################################
 
 output "security_dashboard_ecr_url" {
-  value       = aws_ecr_repository.security_dashboard.repository_url
+  value       = local.enable_eks || local.enable_ecs_web ? aws_ecr_repository.security_dashboard[0].repository_url : "(disabled)"
   description = "ECR repository URL for the security dashboard image"
 }
 
 output "security_dashboard_url" {
-  value       = try("http://${kubernetes_service_v1.security_dashboard.status[0].load_balancer[0].ingress[0].hostname}", "(pending)")
+  value       = local.enable_eks ? try("http://${kubernetes_service_v1.security_dashboard[0].status[0].load_balancer[0].ingress[0].hostname}", "(pending)") : (local.enable_ecs_web ? "http://${aws_lb.security_dashboard[0].dns_name}" : "(disabled)")
   description = "URL to access the Cilium security dashboard"
 }
 
 output "security_dashboard_url_hostname" {
-  value       = try(kubernetes_service_v1.security_dashboard.status[0].load_balancer[0].ingress[0].hostname, "")
-  description = "Raw NLB hostname for the security dashboard (used by global Route 53)"
+  value       = local.enable_eks ? try(kubernetes_service_v1.security_dashboard[0].status[0].load_balancer[0].ingress[0].hostname, "") : (local.enable_ecs_web ? aws_lb.security_dashboard[0].dns_name : "")
+  description = "Raw hostname for the security dashboard (used by global Route 53)"
 }

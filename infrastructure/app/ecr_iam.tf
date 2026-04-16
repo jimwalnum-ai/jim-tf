@@ -1,14 +1,25 @@
 locals {
-  ecr_repos = {
-    flask_app               = aws_ecr_repository.flask_app
-    security_agent          = aws_ecr_repository.security_agent
-    security_dashboard      = aws_ecr_repository.security_dashboard
-    observability_dashboard = aws_ecr_repository.observability_dashboard
+  ecr_repos_base = {
+    flask_app      = aws_ecr_repository.flask_app
+    factor_process = aws_ecr_repository.factor_process
+    factor_persist = aws_ecr_repository.factor_persist
+    factor_test_msg = aws_ecr_repository.factor_test_msg
   }
+  ecr_repos_eks = local.enable_eks ? {
+    security_agent          = aws_ecr_repository.security_agent[0]
+    security_dashboard      = aws_ecr_repository.security_dashboard[0]
+    observability_dashboard = aws_ecr_repository.observability_dashboard[0]
+  } : {}
+  ecr_repos_ecs_web = local.enable_ecs_web ? {
+    security_dashboard      = aws_ecr_repository.security_dashboard[0]
+    observability_dashboard = aws_ecr_repository.observability_dashboard[0]
+  } : {}
+  ecr_repos = merge(local.ecr_repos_base, local.ecr_repos_eks, local.ecr_repos_ecs_web)
 }
 
 # Scoped IAM policy: EKS nodes can only pull from our specific repos
 resource "aws_iam_policy" "eks_ecr_pull" {
+  count       = local.enable_eks ? 1 : 0
   name        = "eks-ecr-pull-scoped"
   description = "Allow EKS nodes to pull images only from designated ECR repositories"
 
@@ -41,6 +52,7 @@ resource "aws_iam_policy" "eks_ecr_pull" {
 
 # ECR repository policy for flask-app
 resource "aws_ecr_repository_policy" "flask_app" {
+  count      = local.enable_eks ? 1 : 0
   repository = aws_ecr_repository.flask_app.name
 
   policy = jsonencode({
@@ -50,7 +62,7 @@ resource "aws_ecr_repository_policy" "flask_app" {
         Sid    = "AllowEKSNodePull"
         Effect = "Allow"
         Principal = {
-          AWS = module.eks_node_group.iam_role_arn
+          AWS = module.eks_node_group[0].iam_role_arn
         }
         Action = [
           "ecr:BatchCheckLayerAvailability",

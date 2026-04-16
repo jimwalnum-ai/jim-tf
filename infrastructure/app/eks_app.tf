@@ -1,13 +1,17 @@
 resource "kubernetes_namespace_v1" "app_namespace" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = "flask-app"
   }
 }
 
 resource "kubernetes_secret_v1" "flask_app_db" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "flask-app-db-credentials"
-    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_namespace[0].metadata[0].name
   }
   data = {
     password = random_password.master_password.result
@@ -15,12 +19,13 @@ resource "kubernetes_secret_v1" "flask_app_db" {
 }
 
 resource "kubernetes_deployment_v1" "flask_app_deployment" {
+  count            = local.enable_eks ? 1 : 0
   depends_on       = [module.eks_node_group]
   wait_for_rollout = false
 
   metadata {
     name      = "flask-app-deployment"
-    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_namespace[0].metadata[0].name
   }
   spec {
     replicas = 2
@@ -76,7 +81,7 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
             name = "FACTOR_DB_PASSWORD"
             value_from {
               secret_key_ref {
-                name = kubernetes_secret_v1.flask_app_db.metadata[0].name
+                name = kubernetes_secret_v1.flask_app_db[0].metadata[0].name
                 key  = "password"
               }
             }
@@ -106,9 +111,11 @@ resource "kubernetes_deployment_v1" "flask_app_deployment" {
 }
 
 resource "kubernetes_service_v1" "flask_app_service" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "flask-app-service"
-    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_namespace[0].metadata[0].name
     annotations = {
       "service.beta.kubernetes.io/aws-load-balancer-type"   = "nlb"
       "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
@@ -123,20 +130,22 @@ resource "kubernetes_service_v1" "flask_app_service" {
       target_port = 8000
       protocol    = "TCP"
     }
-    type = "LoadBalancer" # Use LoadBalancer to expose the service via an ALB
+    type = "LoadBalancer"
   }
 }
 
 resource "kubernetes_horizontal_pod_autoscaler_v2" "flask_app_hpa" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name      = "flask-app-hpa"
-    namespace = kubernetes_namespace_v1.app_namespace.metadata[0].name
+    namespace = kubernetes_namespace_v1.app_namespace[0].metadata[0].name
   }
   spec {
     scale_target_ref {
       api_version = "apps/v1"
       kind        = "Deployment"
-      name        = kubernetes_deployment_v1.flask_app_deployment.metadata[0].name
+      name        = kubernetes_deployment_v1.flask_app_deployment[0].metadata[0].name
     }
     min_replicas = 2
     max_replicas = 10
@@ -164,6 +173,6 @@ resource "kubernetes_horizontal_pod_autoscaler_v2" "flask_app_hpa" {
 }
 
 output "app_url" {
-  value       = kubernetes_service_v1.flask_app_service.status[0].load_balancer[0].ingress[0].hostname
+  value       = local.enable_eks ? kubernetes_service_v1.flask_app_service[0].status[0].load_balancer[0].ingress[0].hostname : (local.enable_ecs_web ? aws_lb.flask_app[0].dns_name : "(disabled)")
   description = "The URL to access the deployed Flask application"
 }

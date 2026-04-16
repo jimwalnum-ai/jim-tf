@@ -12,8 +12,8 @@ variable "ecs_cluster_name" {
 
 variable "ecs_image" {
   type        = string
-  description = "Container image to run the factor scripts."
-  default     = "python:3.11-slim"
+  description = "Override container image for all factor tasks (leave null to use per-task ECR repos)."
+  default     = null
 }
 
 variable "ecs_assign_public_ip" {
@@ -54,45 +54,11 @@ data "aws_subnets" "public_selected" {
 }
 
 locals {
-  ecs_cluster_name        = var.ecs_cluster_name != null && var.ecs_cluster_name != "" ? var.ecs_cluster_name : "ecs-factor-west-${var.env}"
-  ecs_pip_install_command = "pip install --no-cache-dir boto3==1.42.49 botocore==1.42.49 \"urllib3<2.0\" psycopg2-binary"
-  process_script_b64      = base64encode(file("${path.module}/../code/process.py"))
-  persist_script_b64      = base64encode(file("${path.module}/../code/persist.py"))
-  test_msg_script_b64     = base64encode(file("${path.module}/../code/test_msg.py"))
-  ecs_public_subnet_ids   = local.enable_ecs ? data.aws_subnets.public_selected[0].ids : []
-  process_command = trimspace(<<-EOT
-    set -e
-    python - <<'PY'
-    import base64, os, pathlib
-    pathlib.Path("/app").mkdir(parents=True, exist_ok=True)
-    pathlib.Path("/app/process.py").write_bytes(base64.b64decode(os.environ["SCRIPT_B64"]))
-    PY
-    ${local.ecs_pip_install_command}
-    while true; do python /app/process.py || true; sleep 30; done
-  EOT
-  )
-  persist_command = trimspace(<<-EOT
-    set -e
-    python - <<'PY'
-    import base64, os, pathlib
-    pathlib.Path("/app").mkdir(parents=True, exist_ok=True)
-    pathlib.Path("/app/persist.py").write_bytes(base64.b64decode(os.environ["SCRIPT_B64"]))
-    PY
-    ${local.ecs_pip_install_command}
-    while true; do python /app/persist.py || true; sleep 30; done
-  EOT
-  )
-  test_msg_command = trimspace(<<-EOT
-    set -e
-    python - <<'PY'
-    import base64, os, pathlib
-    pathlib.Path("/app").mkdir(parents=True, exist_ok=True)
-    pathlib.Path("/app/test_msg.py").write_bytes(base64.b64decode(os.environ["SCRIPT_B64"]))
-    PY
-    ${local.ecs_pip_install_command}
-    python /app/test_msg.py
-  EOT
-  )
+  ecs_cluster_name      = var.ecs_cluster_name != null && var.ecs_cluster_name != "" ? var.ecs_cluster_name : "ecs-factor-west-${var.env}"
+  ecs_public_subnet_ids = local.enable_ecs ? data.aws_subnets.public_selected[0].ids : []
+  factor_process_image  = var.ecs_image != null ? var.ecs_image : "${aws_ecr_repository.factor_process.repository_url}:latest"
+  factor_persist_image  = var.ecs_image != null ? var.ecs_image : "${aws_ecr_repository.factor_persist.repository_url}:latest"
+  factor_test_msg_image = var.ecs_image != null ? var.ecs_image : "${aws_ecr_repository.factor_test_msg.repository_url}:latest"
 }
 
 resource "aws_ecs_cluster" "factor" {
@@ -147,17 +113,9 @@ resource "aws_ecs_task_definition" "process" {
 
   container_definitions = jsonencode([
     {
-      name       = "process"
-      image      = var.ecs_image
-      essential  = true
-      entryPoint = ["/bin/sh", "-c"]
-      command    = [local.process_command]
-      environment = [
-        {
-          name  = "SCRIPT_B64"
-          value = local.process_script_b64
-        }
-      ]
+      name      = "process"
+      image     = local.factor_process_image
+      essential = true
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -183,17 +141,9 @@ resource "aws_ecs_task_definition" "persist" {
 
   container_definitions = jsonencode([
     {
-      name       = "persist"
-      image      = var.ecs_image
-      essential  = true
-      entryPoint = ["/bin/sh", "-c"]
-      command    = [local.persist_command]
-      environment = [
-        {
-          name  = "SCRIPT_B64"
-          value = local.persist_script_b64
-        }
-      ]
+      name      = "persist"
+      image     = local.factor_persist_image
+      essential = true
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -219,17 +169,9 @@ resource "aws_ecs_task_definition" "test_msg" {
 
   container_definitions = jsonencode([
     {
-      name       = "test-msg"
-      image      = var.ecs_image
-      essential  = true
-      entryPoint = ["/bin/sh", "-c"]
-      command    = [local.test_msg_command]
-      environment = [
-        {
-          name  = "SCRIPT_B64"
-          value = local.test_msg_script_b64
-        }
-      ]
+      name      = "test-msg"
+      image     = local.factor_test_msg_image
+      essential = true
       logConfiguration = {
         logDriver = "awslogs"
         options = {
