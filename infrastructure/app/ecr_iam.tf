@@ -1,8 +1,8 @@
 locals {
   ecr_repos_base = {
-    flask_app      = aws_ecr_repository.flask_app
-    factor_process = aws_ecr_repository.factor_process
-    factor_persist = aws_ecr_repository.factor_persist
+    flask_app       = aws_ecr_repository.flask_app
+    factor_process  = aws_ecr_repository.factor_process
+    factor_persist  = aws_ecr_repository.factor_persist
     factor_test_msg = aws_ecr_repository.factor_test_msg
   }
   ecr_repos_eks = local.enable_eks ? {
