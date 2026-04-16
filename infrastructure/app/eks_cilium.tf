@@ -1,4 +1,5 @@
 resource "helm_release" "cilium" {
+  count      = local.enable_eks ? 1 : 0
   name       = "cilium"
   repository = "https://helm.cilium.io/"
   chart      = "cilium"
@@ -15,7 +16,7 @@ resource "helm_release" "cilium" {
     { name = "routingMode", value = "tunnel" },
     { name = "tunnelProtocol", value = "vxlan" },
     { name = "kubeProxyReplacement", value = "true" },
-    { name = "k8sServiceHost", value = trimprefix(module.eks_cluster.cluster_endpoint, "https://") },
+    { name = "k8sServiceHost", value = trimprefix(module.eks_cluster[0].cluster_endpoint, "https://") },
     { name = "k8sServicePort", value = "443" },
     { name = "bpf.masquerade", value = "true" },
     { name = "enableIPv4Masquerade", value = "true" },

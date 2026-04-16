@@ -11,13 +11,14 @@
 ################################################################################
 
 module "eks_gpu" {
+  count  = local.enable_eks ? 1 : 0
   source = "../modules/eks-gpu"
 
   node_group_name        = "gpu"
-  cluster_name           = module.eks_cluster.cluster_name
-  cluster_service_cidr   = module.eks_cluster.cluster_service_cidr
-  node_security_group_id = module.eks_cluster.node_security_group_id
-  subnet_ids             = data.aws_subnets.eks_public.ids
+  cluster_name           = module.eks_cluster[0].cluster_name
+  cluster_service_cidr   = module.eks_cluster[0].cluster_service_cidr
+  node_security_group_id = module.eks_cluster[0].node_security_group_id
+  subnet_ids             = data.aws_subnets.eks_public[0].ids
 
   # -----------------------------------------------------------------------
   # Sandbox overrides — remove these two lines and restore the defaults
@@ -33,11 +34,11 @@ module "eks_gpu" {
   desired_size = 0
 
   disk_size_gb = 100
-  kms_key_arn  = aws_kms_key.eks_ebs.arn
+  kms_key_arn  = aws_kms_key.eks_ebs[0].arn
 
   iam_role_additional_policies = {
-    ecr_scoped_pull = aws_iam_policy.eks_ecr_pull.arn
-    ebs_kms         = aws_iam_policy.eks_node_kms.arn
+    ecr_scoped_pull = aws_iam_policy.eks_ecr_pull[0].arn
+    ebs_kms         = aws_iam_policy.eks_node_kms[0].arn
   }
 
   nvidia_device_plugin_version = "0.17.0"

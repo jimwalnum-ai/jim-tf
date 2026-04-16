@@ -3,6 +3,8 @@
 ################################################################################
 
 resource "kubernetes_namespace_v1" "monitoring" {
+  count = local.enable_eks ? 1 : 0
+
   metadata {
     name = "monitoring"
   }
@@ -20,8 +22,9 @@ resource "kubernetes_namespace_v1" "monitoring" {
 ################################################################################
 
 resource "helm_release" "kube_prometheus_stack" {
+  count      = local.enable_eks ? 1 : 0
   name       = "kube-prometheus-stack"
-  namespace  = kubernetes_namespace_v1.monitoring.metadata[0].name
+  namespace  = kubernetes_namespace_v1.monitoring[0].metadata[0].name
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
   version    = "69.3.2"
@@ -73,6 +76,6 @@ resource "helm_release" "kube_prometheus_stack" {
 ################################################################################
 
 output "grafana_service_name" {
-  value       = "kube-prometheus-stack-grafana.monitoring.svc.cluster.local"
+  value       = local.enable_eks ? "kube-prometheus-stack-grafana.monitoring.svc.cluster.local" : "(EKS disabled)"
   description = "In-cluster DNS name for the Grafana service"
 }

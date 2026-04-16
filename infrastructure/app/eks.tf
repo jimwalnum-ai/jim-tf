@@ -3,6 +3,7 @@
 ################################################################################
 
 resource "aws_kms_key" "eks_ebs" {
+  count                   = local.enable_eks ? 1 : 0
   description             = "KMS key for EKS node EBS volume encryption"
   deletion_window_in_days = 7
   enable_key_rotation     = true
@@ -16,8 +17,9 @@ resource "aws_kms_key" "eks_ebs" {
 }
 
 resource "aws_kms_alias" "eks_ebs" {
+  count         = local.enable_eks ? 1 : 0
   name          = "alias/eks-node-ebs"
-  target_key_id = aws_kms_key.eks_ebs.key_id
+  target_key_id = aws_kms_key.eks_ebs[0].key_id
 }
 
 data "aws_iam_policy_document" "eks_ebs_kms" {
@@ -75,6 +77,7 @@ data "aws_iam_policy_document" "eks_ebs_kms" {
 }
 
 resource "aws_iam_policy" "eks_node_kms" {
+  count       = local.enable_eks ? 1 : 0
   name        = "eks-node-ebs-kms"
   description = "Allow EKS nodes to use KMS key for EBS encryption"
 
@@ -92,7 +95,7 @@ resource "aws_iam_policy" "eks_node_kms" {
           "kms:DescribeKey",
           "kms:CreateGrant",
         ]
-        Resource = [aws_kms_key.eks_ebs.arn]
+        Resource = [aws_kms_key.eks_ebs[0].arn]
       }
     ]
   })
@@ -105,6 +108,8 @@ resource "aws_iam_policy" "eks_node_kms" {
 ################################################################################
 
 data "aws_subnets" "tgw_selected" {
+  count = local.enable_eks ? 1 : 0
+
   filter {
     name   = "tag:scope"
     values = ["private"]
@@ -120,6 +125,8 @@ data "aws_subnets" "tgw_selected" {
 }
 
 data "aws_subnets" "eks_public" {
+  count = local.enable_eks ? 1 : 0
+
   filter {
     name   = "tag:scope"
     values = ["public"]
@@ -131,13 +138,14 @@ data "aws_subnets" "eks_public" {
 }
 
 module "eks_cluster" {
+  count   = local.enable_eks ? 1 : 0
   source  = "terraform-aws-modules/eks/aws"
   version = "21.15.1"
 
   name               = "eks-cluster"
   kubernetes_version = "1.35"
   vpc_id             = data.aws_vpc.dev-vpc.id
-  subnet_ids         = concat(data.aws_subnets.tgw_selected.ids, data.aws_subnets.eks_public.ids)
+  subnet_ids         = concat(data.aws_subnets.tgw_selected[0].ids, data.aws_subnets.eks_public[0].ids)
   enable_irsa        = true
 
   endpoint_private_access = true

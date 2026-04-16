@@ -5,8 +5,9 @@ locals {
 
 # IAM policy granting the Cluster Autoscaler permission to inspect and modify ASGs
 resource "aws_iam_policy" "cluster_autoscaler" {
-  name        = "${module.eks_cluster.cluster_name}-cluster-autoscaler"
-  description = "IAM policy for Cluster Autoscaler on ${module.eks_cluster.cluster_name}"
+  count       = local.enable_eks ? 1 : 0
+  name        = "${module.eks_cluster[0].cluster_name}-cluster-autoscaler"
+  description = "IAM policy for Cluster Autoscaler on ${module.eks_cluster[0].cluster_name}"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -38,7 +39,7 @@ resource "aws_iam_policy" "cluster_autoscaler" {
         Resource = "*"
         Condition = {
           StringEquals = {
-            "autoscaling:ResourceTag/kubernetes.io/cluster/${module.eks_cluster.cluster_name}" = "owned"
+            "autoscaling:ResourceTag/kubernetes.io/cluster/${module.eks_cluster[0].cluster_name}" = "owned"
           }
         }
       }
@@ -50,7 +51,8 @@ resource "aws_iam_policy" "cluster_autoscaler" {
 
 # IRSA role: allows the Cluster Autoscaler service account to assume this role via OIDC
 resource "aws_iam_role" "cluster_autoscaler" {
-  name = "${module.eks_cluster.cluster_name}-cluster-autoscaler"
+  count = local.enable_eks ? 1 : 0
+  name  = "${module.eks_cluster[0].cluster_name}-cluster-autoscaler"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -58,13 +60,13 @@ resource "aws_iam_role" "cluster_autoscaler" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = module.eks_cluster.oidc_provider_arn
+          Federated = module.eks_cluster[0].oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${module.eks_cluster.oidc_provider}:aud" = "sts.amazonaws.com"
-            "${module.eks_cluster.oidc_provider}:sub" = "system:serviceaccount:${local.cluster_autoscaler_namespace}:${local.cluster_autoscaler_sa_name}"
+            "${module.eks_cluster[0].oidc_provider}:aud" = "sts.amazonaws.com"
+            "${module.eks_cluster[0].oidc_provider}:sub" = "system:serviceaccount:${local.cluster_autoscaler_namespace}:${local.cluster_autoscaler_sa_name}"
           }
         }
       }
@@ -75,12 +77,14 @@ resource "aws_iam_role" "cluster_autoscaler" {
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_autoscaler" {
-  role       = aws_iam_role.cluster_autoscaler.name
-  policy_arn = aws_iam_policy.cluster_autoscaler.arn
+  count      = local.enable_eks ? 1 : 0
+  role       = aws_iam_role.cluster_autoscaler[0].name
+  policy_arn = aws_iam_policy.cluster_autoscaler[0].arn
 }
 
 # Deploy Cluster Autoscaler via Helm
 resource "helm_release" "cluster_autoscaler" {
+  count      = local.enable_eks ? 1 : 0
   name       = "cluster-autoscaler"
   namespace  = local.cluster_autoscaler_namespace
   repository = "https://kubernetes.github.io/autoscaler"
@@ -88,11 +92,11 @@ resource "helm_release" "cluster_autoscaler" {
   version    = "9.55.1"
 
   set = [
-    { name = "autoDiscovery.clusterName", value = module.eks_cluster.cluster_name },
+    { name = "autoDiscovery.clusterName", value = module.eks_cluster[0].cluster_name },
     { name = "awsRegion", value = data.aws_region.current.id },
     { name = "rbac.serviceAccount.create", value = "true" },
     { name = "rbac.serviceAccount.name", value = local.cluster_autoscaler_sa_name },
-    { name = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn", value = aws_iam_role.cluster_autoscaler.arn },
+    { name = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn", value = aws_iam_role.cluster_autoscaler[0].arn },
     { name = "extraArgs.balance-similar-node-groups", value = "true" },
     { name = "extraArgs.skip-nodes-with-system-pods", value = "false" },
     { name = "extraArgs.scale-down-unneeded-time", value = "5m" },
