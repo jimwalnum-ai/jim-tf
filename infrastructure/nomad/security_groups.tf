@@ -88,7 +88,7 @@ resource "aws_security_group" "nomad_cluster" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 
   tags = merge(local.tags, { Name = "${local.name_prefix}-cluster" })

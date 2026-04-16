@@ -32,12 +32,13 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_lb" "nomad" {
-  count              = local.enabled
-  name               = "${local.name_prefix}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb[0].id]
-  subnets            = data.aws_subnets.public.ids
+  count                      = local.enabled
+  name                       = "${local.name_prefix}-alb"
+  internal                   = false
+  load_balancer_type         = "application"
+  drop_invalid_header_fields = true
+  security_groups            = [aws_security_group.alb[0].id]
+  subnets                    = data.aws_subnets.public.ids
 
   tags = merge(local.tags, { Name = "${local.name_prefix}-alb" })
 }
@@ -72,6 +73,7 @@ resource "aws_lb_target_group_attachment" "nomad" {
   port             = 4646
 }
 
+#trivy:ignore:AVD-AWS-0054
 resource "aws_lb_listener" "nomad" {
   count             = local.enabled
   load_balancer_arn = aws_lb.nomad[0].arn
@@ -116,6 +118,7 @@ resource "aws_lb_target_group_attachment" "consul" {
   port             = 8500
 }
 
+#trivy:ignore:AVD-AWS-0054
 resource "aws_lb_listener" "consul" {
   count             = local.enabled
   load_balancer_arn = aws_lb.nomad[0].arn

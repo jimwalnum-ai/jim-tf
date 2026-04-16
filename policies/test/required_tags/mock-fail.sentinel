@@ -1,0 +1,38 @@
+resource_changes = [
+  {
+    "address":        "aws_ecr_repository.untagged",
+    "module_address": "",
+    "type":           "aws_ecr_repository",
+    "name":           "untagged",
+    "change": {
+      "actions": ["create"],
+      "before":  null,
+      "after": {
+        "name":                 "untagged-repo",
+        "image_tag_mutability": "IMMUTABLE",
+        "image_scanning_configuration": [
+          {
+            "scan_on_push": true,
+          },
+        ],
+        "tags": {
+          "env": "dev",
+        },
+      },
+    },
+  },
+  {
+    "address":        "aws_s3_bucket.untagged",
+    "module_address": "",
+    "type":           "aws_s3_bucket",
+    "name":           "untagged",
+    "change": {
+      "actions": ["create"],
+      "before":  null,
+      "after": {
+        "bucket": "untagged-bucket",
+        "tags":   {},
+      },
+    },
+  },
+]

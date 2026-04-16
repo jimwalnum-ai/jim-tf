@@ -1,0 +1,41 @@
+# Policy: required_tags
+#
+# Enforces that taggable AWS resources include the required tags.
+# Required tags provide traceability, cost attribution, and lifecycle management.
+#
+# Required tags:
+#   - env        : deployment environment (e.g. dev, stg, prd)
+#   - managed_by : tool responsible for provisioning (e.g. terraform)
+#
+# Enforcement level: advisory
+
+import "tfplan/v2" as tfplan
+
+required_tags = ["env", "managed_by"]
+
+# Resource types in this codebase that are expected to carry tags
+taggable_types = [
+  "aws_s3_bucket",
+  "aws_ecr_repository",
+  "aws_ecs_cluster",
+  "aws_eks_cluster",
+  "aws_vpc",
+  "aws_security_group",
+  "aws_kms_key",
+  "aws_db_instance",
+  "aws_elasticache_cluster",
+  "aws_lb",
+]
+
+# Collect resources that are being created and are missing at least one required tag
+violating_resources = filter tfplan.resource_changes as _, rc {
+  rc.type in taggable_types and
+  rc.change.actions contains "create" and
+  not (all required_tags as tag {
+    tag in keys(rc.change.after.tags else {})
+  })
+}
+
+main = rule {
+  length(violating_resources) is 0
+}

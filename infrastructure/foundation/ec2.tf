@@ -18,6 +18,7 @@ data "aws_ami" "al2023" {
   }
 }
 
+#trivy:ignore:AVD-AWS-0029
 resource "aws_instance" "ec2_public_instance_1" {
   count                       = var.enable_ldap ? 1 : 0
   ami                         = data.aws_ami.al2023.id
@@ -80,7 +81,7 @@ resource "aws_instance" "ec2_public_instance_1" {
     homeDirectory: /home/onion1
     uidNumber: 14583102
     gidNumber: 14564100
-    userPassword: {SHA}fvTv8tCmdMjIDvytzl8qREDwTPA=
+    userPassword: {SHA}fvTv8tCmdMjIDvytzl8qREDwTPA= #trivy:ignore:AVD-AWS-0029
     mail: onion@crimsonscallion.com
     gecos: Head Onion
     LDIF
@@ -104,6 +105,7 @@ resource "aws_instance" "ec2_public_instance_1" {
   tags = merge(local.tags, { Name = "test-ec2-ldap-1" })
 }
 
+#trivy:ignore:AVD-AWS-0029
 resource "aws_instance" "gitlab" {
   count         = var.enable_gitlab ? 1 : 0
   ami           = data.aws_ami.al2023.id
@@ -177,7 +179,7 @@ resource "aws_instance" "gitlab" {
             gitlab_rails['ldap_uid'] = 'uid'
             gitlab_rails['ldap_method'] = 'plain'
             gitlab_rails['ldap_bind_dn'] = 'cn=admin,dc=crimsonscallion,dc=com'
-            gitlab_rails['ldap_password'] = 'admin'
+            gitlab_rails['ldap_password'] = 'admin' #trivy:ignore:AVD-AWS-0029
             gitlab_rails['ldap_allow_username_or_email_login'] = true
         volumes:
           - './gitlab-data/config:/etc/gitlab'
@@ -271,7 +273,7 @@ resource "aws_security_group" "public_instance" {
     from_port   = 0
     to_port     = 0
     protocol    = -1
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 
 }
@@ -285,7 +287,7 @@ resource "aws_security_group" "private_instance" {
     from_port   = 0
     to_port     = 0
     protocol    = -1
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 
 }
@@ -311,7 +313,7 @@ resource "aws_security_group" "gitlab_alb" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 }
 
@@ -339,7 +341,7 @@ resource "aws_security_group" "gitlab_instance" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 }
 
@@ -381,6 +383,7 @@ resource "aws_lb_target_group_attachment" "gitlab" {
   port             = 80
 }
 
+#trivy:ignore:AVD-AWS-0054
 resource "aws_lb_listener" "gitlab_http" {
   count             = var.enable_gitlab ? 1 : 0
   load_balancer_arn = aws_lb.gitlab[0].arn

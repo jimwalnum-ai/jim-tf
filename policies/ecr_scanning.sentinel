@@ -1,0 +1,26 @@
+# Policy: ecr_scanning
+#
+# Enforces that all AWS ECR repositories have image scanning enabled on push.
+# This ensures container images are automatically scanned for vulnerabilities
+# when pushed to the registry.
+#
+# Enforcement level: hard-mandatory
+
+import "tfplan/v2" as tfplan
+
+# Collect all ECR repository resources being created or updated
+ecr_repos = filter tfplan.resource_changes as _, rc {
+  rc.type is "aws_ecr_repository" and
+  (rc.change.actions contains "create" or rc.change.actions contains "update")
+}
+
+# Rule: scan_on_push must be true for all ECR repositories
+scan_on_push_enabled = rule {
+  all ecr_repos as addr, repo {
+    repo.change.after.image_scanning_configuration[0].scan_on_push is true
+  }
+}
+
+main = rule {
+  scan_on_push_enabled
+}

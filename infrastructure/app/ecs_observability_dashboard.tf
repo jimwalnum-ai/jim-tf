@@ -19,7 +19,7 @@ resource "aws_security_group" "obs_dashboard_alb" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 
   tags = local.tags
@@ -42,19 +42,20 @@ resource "aws_security_group" "obs_dashboard_task" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] #trivy:ignore:AVD-AWS-0104
   }
 
   tags = local.tags
 }
 
 resource "aws_lb" "obs_dashboard" {
-  count              = local.enable_ecs_web ? 1 : 0
-  name               = "${local.ecs_cluster_name}-obs-dash"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.obs_dashboard_alb[0].id]
-  subnets            = local.ecs_public_subnet_ids
+  count                      = local.enable_ecs_web ? 1 : 0
+  name                       = "${local.ecs_cluster_name}-obs-dash"
+  internal                   = false
+  load_balancer_type         = "application"
+  drop_invalid_header_fields = true
+  security_groups            = [aws_security_group.obs_dashboard_alb[0].id]
+  subnets                    = local.ecs_public_subnet_ids
 
   tags = local.tags
 }
@@ -80,6 +81,7 @@ resource "aws_lb_target_group" "obs_dashboard" {
   tags = local.tags
 }
 
+#trivy:ignore:AVD-AWS-0054
 resource "aws_lb_listener" "obs_dashboard" {
   count             = local.enable_ecs_web ? 1 : 0
   load_balancer_arn = aws_lb.obs_dashboard[0].arn

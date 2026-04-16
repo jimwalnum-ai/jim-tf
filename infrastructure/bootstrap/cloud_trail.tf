@@ -2,6 +2,8 @@ resource "aws_cloudtrail" "cs" {
   name                          = "cs-cloudtrail"
   s3_bucket_name                = module.s3-cloudtrail.bucket_name
   include_global_service_events = false
+  enable_log_file_validation    = true
+  kms_key_id                    = module.backend-kms-key.kms_key_arn
   depends_on                    = [aws_s3_bucket_policy.cloudtrail]
 }
 

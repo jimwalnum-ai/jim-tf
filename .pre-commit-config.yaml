@@ -8,3 +8,19 @@ repos:
       - id: terraform_tflint
         args:
           - "--args=--minimum-failure-severity=error"
+
+      - id: terraform_trivy
+        args:
+          - "--args=--severity=CRITICAL"
+          - "--args=--tf-exclude-downloaded-modules=true"
+          - "--args=--skip-dirs=**/.terraform"
+
+  - repo: local
+    hooks:
+      - id: sentinel-test
+        name: Sentinel policy tests
+        description: Runs HashiCorp Sentinel policy tests against infrastructure policies.
+        language: system
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)/policies" && sentinel test'
+        files: \.sentinel$
+        pass_filenames: false

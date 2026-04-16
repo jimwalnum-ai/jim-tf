@@ -1,0 +1,25 @@
+resource_changes = [
+  {
+    "address":        "aws_ecr_repository.flask_app",
+    "module_address": "",
+    "type":           "aws_ecr_repository",
+    "name":           "flask_app",
+    "change": {
+      "actions": ["create"],
+      "before":  null,
+      "after": {
+        "name":                 "flask-app",
+        "image_tag_mutability": "MUTABLE",
+        "image_scanning_configuration": [
+          {
+            "scan_on_push": false,
+          },
+        ],
+        "tags": {
+          "env":        "dev",
+          "managed_by": "terraform",
+        },
+      },
+    },
+  },
+]

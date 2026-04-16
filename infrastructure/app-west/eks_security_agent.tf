@@ -36,9 +36,14 @@ resource "aws_ecr_lifecycle_policy" "security_agent" {
 # SNS Topic — Security Alerts
 ################################################################################
 
+data "aws_kms_key" "sns" {
+  key_id = "alias/aws/sns"
+}
+
 resource "aws_sns_topic" "security_alerts" {
-  name = "${module.eks_cluster.cluster_name}-cilium-security-alerts"
-  tags = local.tags
+  name              = "${module.eks_cluster.cluster_name}-cilium-security-alerts"
+  kms_master_key_id = data.aws_kms_key.sns.id
+  tags              = local.tags
 }
 
 variable "security_alert_email" {

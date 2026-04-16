@@ -3,16 +3,22 @@
 # SNS Topic — Security Alerts
 ################################################################################
 
+data "aws_kms_key" "sns" {
+  key_id = "alias/aws/sns"
+}
+
 resource "aws_sns_topic" "security_alerts" {
-  count = local.enable_eks ? 1 : 0
-  name  = "${module.eks_cluster[0].cluster_name}-cilium-security-alerts"
-  tags  = local.tags
+  count             = local.enable_eks ? 1 : 0
+  name              = "${module.eks_cluster[0].cluster_name}-cilium-security-alerts"
+  kms_master_key_id = data.aws_kms_key.sns.id
+  tags              = local.tags
 }
 
 resource "aws_sns_topic" "security_alerts_ecs" {
-  count = local.enable_ecs_web ? 1 : 0
-  name  = "${local.ecs_cluster_name}-security-alerts"
-  tags  = local.tags
+  count             = local.enable_ecs_web ? 1 : 0
+  name              = "${local.ecs_cluster_name}-security-alerts"
+  kms_master_key_id = data.aws_kms_key.sns.id
+  tags              = local.tags
 }
 
 locals {

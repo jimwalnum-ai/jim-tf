@@ -31,7 +31,7 @@ locals {
 
 resource "aws_ecr_repository" "factor_worker" {
   name                 = "factor-worker"
-  image_tag_mutability = "MUTABLE"
+  image_tag_mutability = "IMMUTABLE"
   force_delete         = true
 
   image_scanning_configuration {

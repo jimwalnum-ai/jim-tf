@@ -16,6 +16,10 @@ data "aws_ami" "al2023_arm" {
   }
 }
 
+data "aws_kms_key" "ebs" {
+  key_id = "alias/aws/ebs"
+}
+
 resource "aws_instance" "server" {
   count = local.server_actual_count
 
@@ -29,6 +33,8 @@ resource "aws_instance" "server" {
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
+    encrypted   = true
+    kms_key_id  = data.aws_kms_key.ebs.arn
   }
 
   metadata_options {

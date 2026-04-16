@@ -1,0 +1,48 @@
+resource_changes = [
+  {
+    "address":        "aws_ecr_repository.flask_app",
+    "module_address": "",
+    "type":           "aws_ecr_repository",
+    "name":           "flask_app",
+    "change": {
+      "actions": ["create"],
+      "before":  null,
+      "after": {
+        "name":                 "flask-app",
+        "image_tag_mutability": "IMMUTABLE",
+        "image_scanning_configuration": [
+          {
+            "scan_on_push": true,
+          },
+        ],
+        "tags": {
+          "env":        "dev",
+          "managed_by": "terraform",
+        },
+      },
+    },
+  },
+  {
+    "address":        "aws_ecr_repository.factor_worker",
+    "module_address": "",
+    "type":           "aws_ecr_repository",
+    "name":           "factor_worker",
+    "change": {
+      "actions": ["create"],
+      "before":  null,
+      "after": {
+        "name":                 "factor-worker",
+        "image_tag_mutability": "IMMUTABLE",
+        "image_scanning_configuration": [
+          {
+            "scan_on_push": true,
+          },
+        ],
+        "tags": {
+          "env":        "dev",
+          "managed_by": "terraform",
+        },
+      },
+    },
+  },
+]
