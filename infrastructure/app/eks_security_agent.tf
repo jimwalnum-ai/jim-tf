@@ -1,38 +1,3 @@
-################################################################################
-# ECR Repository — Security Agent Image
-################################################################################
-
-resource "aws_ecr_repository" "security_agent" {
-  count                = local.enable_eks ? 1 : 0
-  name                 = "cilium-security-agent"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = local.tags
-}
-
-resource "aws_ecr_lifecycle_policy" "security_agent" {
-  count      = local.enable_eks ? 1 : 0
-  repository = aws_ecr_repository.security_agent[0].name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep only the last 5 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = { type = "expire" }
-      }
-    ]
-  })
-}
 
 ################################################################################
 # SNS Topic — Security Alerts
@@ -205,7 +170,7 @@ resource "kubernetes_cron_job_v1" "security_agent" {
 
             container {
               name              = "agent"
-              image             = "${aws_ecr_repository.security_agent[0].repository_url}:latest"
+              image             = "${aws_ecr_repository.security_agent.repository_url}:latest"
               image_pull_policy = "Always"
 
               env {
@@ -283,7 +248,7 @@ resource "kubernetes_service_account_v1" "security_agent" {
 ################################################################################
 
 output "security_agent_ecr_url" {
-  value       = local.enable_eks ? aws_ecr_repository.security_agent[0].repository_url : "(EKS disabled)"
+  value       = aws_ecr_repository.security_agent.repository_url
   description = "ECR repository URL for the Cilium security agent image"
 }
 

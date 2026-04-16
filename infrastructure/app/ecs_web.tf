@@ -28,7 +28,7 @@ resource "aws_security_group" "web_alb" {
 resource "aws_security_group" "flask_app_task" {
   count       = local.enable_ecs_web ? 1 : 0
   name        = "${local.ecs_cluster_name}-flask-app-task"
-  description = "Flask app ECS tasks — inbound from ALB only"
+  description = "Flask app ECS tasks inbound from ALB only"
   vpc_id      = data.aws_vpc.dev-vpc.id
 
   ingress {
@@ -103,8 +103,8 @@ resource "aws_ecs_task_definition" "flask_app" {
   family                   = "${local.ecs_cluster_name}-flask-app"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   execution_role_arn       = aws_iam_role.ecs_task_execution[0].arn
 
   container_definitions = jsonencode([{
@@ -141,7 +141,7 @@ resource "aws_ecs_service" "flask_app" {
   name            = "${local.ecs_cluster_name}-flask-app"
   cluster         = aws_ecs_cluster.factor[0].id
   task_definition = aws_ecs_task_definition.flask_app[0].arn
-  desired_count   = 2
+  desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {

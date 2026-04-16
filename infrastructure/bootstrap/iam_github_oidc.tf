@@ -75,6 +75,7 @@ data "aws_iam_policy_document" "ecr_push" {
     ]
     resources = [
       "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/flask-app",
+      "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/factor-worker",
       "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/factor-process",
       "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/factor-persist",
       "arn:${data.aws_partition.current.partition}:ecr:${data.aws_region.current.id}:${local.acct_id}:repository/factor-test-msg",
@@ -98,10 +99,16 @@ resource "aws_iam_role_policy_attachment" "github_actions_ecr_push" {
 }
 
 ################################################################################
-# Output — add this ARN as GitHub secret AWS_OIDC_ROLE_ARN
+# GitHub Secret — keep AWS_OIDC_ROLE_ARN in sync automatically
 ################################################################################
 
+resource "github_actions_secret" "oidc_role_arn" {
+  repository      = "jim-tf"
+  secret_name     = "AWS_OIDC_ROLE_ARN"
+  plaintext_value = aws_iam_role.github_actions.arn
+}
+
 output "github_actions_role_arn" {
-  description = "IAM role ARN for GitHub Actions OIDC — set as secret AWS_OIDC_ROLE_ARN in the repo."
+  description = "IAM role ARN for GitHub Actions OIDC."
   value       = aws_iam_role.github_actions.arn
 }

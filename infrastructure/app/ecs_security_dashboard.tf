@@ -28,7 +28,7 @@ resource "aws_security_group" "sec_dashboard_alb" {
 resource "aws_security_group" "sec_dashboard_task" {
   count       = local.enable_ecs_web ? 1 : 0
   name        = "${local.ecs_cluster_name}-sec-dashboard-task"
-  description = "Security dashboard ECS tasks — inbound from ALB only"
+  description = "Security dashboard ECS tasks inbound from ALB only"
   vpc_id      = data.aws_vpc.dev-vpc.id
 
   ingress {

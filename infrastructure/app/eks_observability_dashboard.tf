@@ -1,38 +1,3 @@
-################################################################################
-# ECR Repository — Observability Dashboard Image
-################################################################################
-
-resource "aws_ecr_repository" "observability_dashboard" {
-  count                = local.enable_eks || local.enable_ecs_web ? 1 : 0
-  name                 = "observability-dashboard"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = local.tags
-}
-
-resource "aws_ecr_lifecycle_policy" "observability_dashboard" {
-  count      = local.enable_eks || local.enable_ecs_web ? 1 : 0
-  repository = aws_ecr_repository.observability_dashboard[0].name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep only the last 5 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = { type = "expire" }
-      }
-    ]
-  })
-}
 
 ################################################################################
 # Remote state — read Nomad ALB DNS for dashboard config
@@ -236,7 +201,7 @@ resource "kubernetes_deployment_v1" "observability_dashboard" {
 
         container {
           name              = "dashboard"
-          image             = "${aws_ecr_repository.observability_dashboard[0].repository_url}:latest"
+          image             = "${aws_ecr_repository.observability_dashboard.repository_url}:latest"
           image_pull_policy = "Always"
 
           port {
@@ -354,7 +319,7 @@ resource "kubernetes_service_v1" "observability_dashboard" {
 ################################################################################
 
 output "observability_dashboard_ecr_url" {
-  value       = local.enable_eks || local.enable_ecs_web ? aws_ecr_repository.observability_dashboard[0].repository_url : "(disabled)"
+  value       = aws_ecr_repository.observability_dashboard.repository_url
   description = "ECR repository URL for the observability dashboard image"
 }
 

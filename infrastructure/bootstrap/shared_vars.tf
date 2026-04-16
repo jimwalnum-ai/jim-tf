@@ -69,9 +69,18 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 6.0.0"
     }
+    github = {
+      source  = "integrations/github"
+      version = ">= 6.0.0"
+    }
   }
 }
 
 provider "aws" {
   region = "us-east-1"
+}
+
+# Authenticates via GITHUB_TOKEN env var
+provider "github" {
+  owner = "jimwalnum-ai"
 }

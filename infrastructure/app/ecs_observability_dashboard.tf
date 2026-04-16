@@ -28,7 +28,7 @@ resource "aws_security_group" "obs_dashboard_alb" {
 resource "aws_security_group" "obs_dashboard_task" {
   count       = local.enable_ecs_web ? 1 : 0
   name        = "${local.ecs_cluster_name}-obs-dashboard-task"
-  description = "Observability dashboard ECS tasks — inbound from ALB only"
+  description = "Observability dashboard ECS tasks inbound from ALB only"
   vpc_id      = data.aws_vpc.dev-vpc.id
 
   ingress {

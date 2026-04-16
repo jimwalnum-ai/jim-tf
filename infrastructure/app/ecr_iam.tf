@@ -1,6 +1,7 @@
 locals {
   ecr_repos_base = {
     flask_app       = aws_ecr_repository.flask_app
+    factor_worker   = aws_ecr_repository.factor_worker
     factor_process  = aws_ecr_repository.factor_process
     factor_persist  = aws_ecr_repository.factor_persist
     factor_test_msg = aws_ecr_repository.factor_test_msg
@@ -50,6 +51,19 @@ resource "aws_iam_policy" "eks_ecr_pull" {
   tags = local.tags
 }
 
+locals {
+  github_actions_role_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/github-actions-ecr-push"
+  ci_push_actions = [
+    "ecr:BatchCheckLayerAvailability",
+    "ecr:GetDownloadUrlForLayer",
+    "ecr:BatchGetImage",
+    "ecr:PutImage",
+    "ecr:InitiateLayerUpload",
+    "ecr:UploadLayerPart",
+    "ecr:CompleteLayerUpload",
+  ]
+}
+
 # ECR repository policy for flask-app
 resource "aws_ecr_repository_policy" "flask_app" {
   count      = local.enable_eks ? 1 : 0
@@ -76,17 +90,74 @@ resource "aws_ecr_repository_policy" "flask_app" {
         Principal = {
           AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/cs-terraform-role"
         }
-        Action = [
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload"
-        ]
+        Action = local.ci_push_actions
+      },
+      {
+        Sid    = "AllowGitHubActionsPush"
+        Effect = "Allow"
+        Principal = {
+          AWS = local.github_actions_role_arn
+        }
+        Action = local.ci_push_actions
       }
     ]
+  })
+}
+
+# ECR repository policies for factor images — grant GitHub Actions push access
+resource "aws_ecr_repository_policy" "factor_worker" {
+  repository = aws_ecr_repository.factor_worker.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "factor_process" {
+  repository = aws_ecr_repository.factor_process.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "factor_persist" {
+  repository = aws_ecr_repository.factor_persist.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "factor_test_msg" {
+  repository = aws_ecr_repository.factor_test_msg.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
   })
 }
 

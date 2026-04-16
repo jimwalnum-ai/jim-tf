@@ -1,38 +1,3 @@
-################################################################################
-# ECR Repository — Security Dashboard Image
-################################################################################
-
-resource "aws_ecr_repository" "security_dashboard" {
-  count                = local.enable_eks || local.enable_ecs_web ? 1 : 0
-  name                 = "cilium-security-dashboard"
-  image_tag_mutability = "IMMUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = local.tags
-}
-
-resource "aws_ecr_lifecycle_policy" "security_dashboard" {
-  count      = local.enable_eks || local.enable_ecs_web ? 1 : 0
-  repository = aws_ecr_repository.security_dashboard[0].name
-
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep only the last 5 images"
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = { type = "expire" }
-      }
-    ]
-  })
-}
 
 ################################################################################
 # IRSA — Dashboard (S3 read-only for reports)
@@ -150,7 +115,7 @@ resource "kubernetes_deployment_v1" "security_dashboard" {
 
         container {
           name              = "dashboard"
-          image             = "${aws_ecr_repository.security_dashboard[0].repository_url}:latest"
+          image             = "${aws_ecr_repository.security_dashboard.repository_url}:latest"
           image_pull_policy = "Always"
 
           port {
@@ -249,7 +214,7 @@ resource "kubernetes_service_v1" "security_dashboard" {
 ################################################################################
 
 output "security_dashboard_ecr_url" {
-  value       = local.enable_eks || local.enable_ecs_web ? aws_ecr_repository.security_dashboard[0].repository_url : "(disabled)"
+  value       = aws_ecr_repository.security_dashboard.repository_url
   description = "ECR repository URL for the security dashboard image"
 }
 

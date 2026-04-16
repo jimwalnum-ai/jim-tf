@@ -4,7 +4,7 @@ job "factor-process" {
   type        = "service"
 
   group "process" {
-    count = 2
+    count = 4
 
     restart {
       attempts = 10
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 QUEUE_NAME = os.getenv("FACTOR_QUEUE_NAME", "SQS_FACTOR_DEV")
 RESULT_QUEUE_NAME = os.getenv("FACTOR_RESULT_QUEUE_NAME", "SQS_FACTOR_RESULT_DEV")
 VISIBILITY_TIMEOUT_SECONDS = int(os.getenv("SQS_VISIBILITY_TIMEOUT_SECONDS", "60"))
-MAX_WORKERS = int(os.getenv("FACTOR_WORKERS", "4"))
-RECEIVER_THREADS = int(os.getenv("RECEIVER_THREADS", "8"))
+MAX_WORKERS = int(os.getenv("FACTOR_WORKERS", "8"))
+RECEIVER_THREADS = int(os.getenv("RECEIVER_THREADS", "16"))
 
 
 def do_factor(in_num):
@@ -177,8 +177,8 @@ PYEOF
       }
 
       resources {
-        cpu    = 512
-        memory = 1024
+        cpu    = 1024
+        memory = 2048
       }
 
       service {
