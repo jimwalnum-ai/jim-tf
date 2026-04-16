@@ -5,7 +5,7 @@
 data "terraform_remote_state" "app_east" {
   backend = "s3"
   config = {
-    bucket = "csx3-use1-terraform-state"
+    bucket = "csx4-use1-terraform-state"
     key    = "app/state.tfstate"
     region = "us-east-1"
   }

@@ -1,21 +1,14 @@
 locals {
-  ecr_repos_base = {
-    flask_app       = aws_ecr_repository.flask_app
-    factor_worker   = aws_ecr_repository.factor_worker
-    factor_process  = aws_ecr_repository.factor_process
-    factor_persist  = aws_ecr_repository.factor_persist
-    factor_test_msg = aws_ecr_repository.factor_test_msg
+  ecr_repos = {
+    flask_app               = aws_ecr_repository.flask_app
+    factor_worker           = aws_ecr_repository.factor_worker
+    factor_process          = aws_ecr_repository.factor_process
+    factor_persist          = aws_ecr_repository.factor_persist
+    factor_test_msg         = aws_ecr_repository.factor_test_msg
+    security_agent          = aws_ecr_repository.security_agent
+    security_dashboard      = aws_ecr_repository.security_dashboard
+    observability_dashboard = aws_ecr_repository.observability_dashboard
   }
-  ecr_repos_eks = local.enable_eks ? {
-    security_agent          = aws_ecr_repository.security_agent[0]
-    security_dashboard      = aws_ecr_repository.security_dashboard[0]
-    observability_dashboard = aws_ecr_repository.observability_dashboard[0]
-  } : {}
-  ecr_repos_ecs_web = local.enable_ecs_web ? {
-    security_dashboard      = aws_ecr_repository.security_dashboard[0]
-    observability_dashboard = aws_ecr_repository.observability_dashboard[0]
-  } : {}
-  ecr_repos = merge(local.ecr_repos_base, local.ecr_repos_eks, local.ecr_repos_ecs_web)
 }
 
 # Scoped IAM policy: EKS nodes can only pull from our specific repos
@@ -149,6 +142,48 @@ resource "aws_ecr_repository_policy" "factor_persist" {
 
 resource "aws_ecr_repository_policy" "factor_test_msg" {
   repository = aws_ecr_repository.factor_test_msg.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "security_agent" {
+  repository = aws_ecr_repository.security_agent.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "security_dashboard" {
+  repository = aws_ecr_repository.security_dashboard.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowGitHubActionsPush"
+      Effect    = "Allow"
+      Principal = { AWS = local.github_actions_role_arn }
+      Action    = local.ci_push_actions
+    }]
+  })
+}
+
+resource "aws_ecr_repository_policy" "observability_dashboard" {
+  repository = aws_ecr_repository.observability_dashboard.name
 
   policy = jsonencode({
     Version = "2012-10-17"

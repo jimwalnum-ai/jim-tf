@@ -144,7 +144,7 @@ resource "aws_ecs_task_definition" "security_dashboard" {
 
   container_definitions = jsonencode([{
     name      = "sec-dashboard"
-    image     = "${aws_ecr_repository.security_dashboard[0].repository_url}:latest"
+    image     = "${aws_ecr_repository.security_dashboard.repository_url}:latest"
     essential = true
     portMappings = [{
       containerPort = 8080

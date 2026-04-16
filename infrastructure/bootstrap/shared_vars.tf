@@ -40,7 +40,7 @@ variable "enable_private_ec2" {
 
 locals {
   state_bucket_name  = "${local.prefix}-use1-terraform-state"
-  prefix             = "csx3"
+  prefix             = "csx4"
   enable_ecs         = var.enable_ecs
   enable_eks         = var.enable_eks
   enable_ecs_web     = var.enable_ecs && !var.enable_eks

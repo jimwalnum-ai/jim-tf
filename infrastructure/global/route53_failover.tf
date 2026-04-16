@@ -5,7 +5,7 @@
 data "terraform_remote_state" "basics" {
   backend = "s3"
   config = {
-    bucket = "csx3-use1-terraform-state"
+    bucket = "csx4-use1-terraform-state"
     key    = "basics/state.tfstate"
     region = "us-east-1"
   }
@@ -14,7 +14,7 @@ data "terraform_remote_state" "basics" {
 data "terraform_remote_state" "app_east" {
   backend = "s3"
   config = {
-    bucket = "csx3-use1-terraform-state"
+    bucket = "csx4-use1-terraform-state"
     key    = "app/state.tfstate"
     region = "us-east-1"
   }
@@ -23,7 +23,7 @@ data "terraform_remote_state" "app_east" {
 data "terraform_remote_state" "app_west" {
   backend = "s3"
   config = {
-    bucket = "csx3-use1-terraform-state"
+    bucket = "csx4-use1-terraform-state"
     key    = "app-west/state.tfstate"
     region = "us-east-1"
   }
