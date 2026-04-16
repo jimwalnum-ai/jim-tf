@@ -2,6 +2,7 @@ resource "aws_sqs_queue" "factor_dev" {
   name                       = "SQS_FACTOR_DEV"
   redrive_policy             = "{\"deadLetterTargetArn\":\"${aws_sqs_queue.results_updates_dl_queue.arn}\",\"maxReceiveCount\":5}"
   visibility_timeout_seconds = 300
+  kms_master_key_id          = module.core-kms-key.kms_key_arn
   tags                       = local.tags
 }
 
@@ -9,6 +10,7 @@ resource "aws_sqs_queue" "factor_result_dev" {
   name                       = "SQS_FACTOR_RESULT_DEV"
   redrive_policy             = "{\"deadLetterTargetArn\":\"${aws_sqs_queue.results_updates_dl_queue.arn}\",\"maxReceiveCount\":10}"
   visibility_timeout_seconds = 300
+  kms_master_key_id          = module.core-kms-key.kms_key_arn
   tags                       = local.tags
 }
 
@@ -16,6 +18,7 @@ resource "aws_sqs_queue" "factor_ts" {
   name                       = "SQS_FACTOR_TS_DEV"
   visibility_timeout_seconds = 60
   message_retention_seconds  = 345600
+  kms_master_key_id          = module.core-kms-key.kms_key_arn
   tags                       = local.tags
 }
 
@@ -23,12 +26,14 @@ resource "aws_sqs_queue" "factor_result_ts" {
   name                       = "SQS_FACTOR_RESULT_TS_DEV"
   visibility_timeout_seconds = 300
   message_retention_seconds  = 345600
+  kms_master_key_id          = module.core-kms-key.kms_key_arn
   tags                       = local.tags
 }
 
 resource "aws_sqs_queue" "results_updates_dl_queue" {
-  name = "SQS_FACTOR_DLQ"
-  tags = local.tags
+  name              = "SQS_FACTOR_DLQ"
+  kms_master_key_id = module.core-kms-key.kms_key_arn
+  tags              = local.tags
 }
 
 locals {

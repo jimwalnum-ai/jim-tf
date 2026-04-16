@@ -16,7 +16,7 @@ locals {
 module "core-kms-key" {
   source                               = "../modules/kms"
   key_name                             = "cs-core-kms"
-  readonly_roles                       = ["arn:aws:iam::${local.acct_id}:user/cloud_user"]
+  readonly_roles                       = compact(["arn:aws:iam::${local.acct_id}:user/cloud_user", var.ecs_task_role_arn, var.eks_workloads_role_arn])
   write_roles                          = ["arn:aws:iam::${local.acct_id}:role/cs-terraform-role", "arn:aws:iam::${local.acct_id}:root"]
   autoscaling_service_role_arn_pattern = "arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"
   eks_node_role_arn_pattern            = ["arn:aws:iam::${local.acct_id}:role/unused-kms-policy-placeholder"]

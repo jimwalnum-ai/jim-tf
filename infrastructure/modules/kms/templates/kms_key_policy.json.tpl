@@ -133,5 +133,26 @@
             ],
             "Resource": "*"
         }
+        ,
+        {
+            "Sid": "Allow CloudWatch Logs to use the key",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "logs.${region}.amazonaws.com"
+            },
+            "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "ArnLike": {
+                    "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:${region}:*:log-group:*"
+                }
+            }
+        }
     ]
 }

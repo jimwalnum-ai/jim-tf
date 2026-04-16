@@ -38,14 +38,21 @@ variable "enable_private_ec2" {
   default     = false
 }
 
+variable "enable_aurora" {
+  description = "Deploy Aurora PostgreSQL clusters for dev and prd environments."
+  type        = bool
+  default     = true
+}
+
 locals {
   state_bucket_name  = "${local.prefix}-use1-terraform-state"
-  prefix             = "csx4"
+  prefix             = "csx5"
   enable_ecs         = var.enable_ecs
   enable_eks         = var.enable_eks
   enable_ecs_web     = var.enable_ecs && !var.enable_eks
   enable_nomad       = var.enable_nomad
   enable_private_ec2 = var.enable_private_ec2
+  enable_aurora      = var.enable_aurora
   tagmap             = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags           = { for rg in local.tagmap : rg.tag => rg.value }
   top_tagmap         = csvdecode(file("../top_level_tags.csv"))

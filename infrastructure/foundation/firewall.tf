@@ -102,6 +102,7 @@ resource "aws_networkfirewall_rule_group" "block_cross_vpc" {
 resource "aws_cloudwatch_log_group" "fw_alert_log_group" {
   name              = "/aws/network-firewall/alert"
   retention_in_days = 365
+  kms_key_id        = module.core-kms-key.kms_key_arn
 }
 
 resource "aws_s3_bucket" "fw_flow_bucket" {
