@@ -47,5 +47,5 @@ module "vpc" {
   tgw_subnet_tags        = each.value.tgw_subnet_tags
   use_transit_gateway    = local.use_transit_gateway
   tags                   = local.tags
-  depends_on             = [module.s3-flow-log-bucket, aws_vpc_ipam.cs-west]
+  depends_on             = [module.s3-flow-log-bucket, aws_vpc_ipam_pool_cidr.us-west-2]
 }

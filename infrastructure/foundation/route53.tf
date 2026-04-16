@@ -20,19 +20,21 @@ module "private_hosted_zone" {
 }
 
 resource "aws_route53_record" "git" {
+  count   = var.enable_gitlab ? 1 : 0
   zone_id = module.private_hosted_zone.zone_id
   name    = "git.crimsonscallion.com"
   type    = "A"
   ttl     = 300
-  records = [aws_instance.gitlab.private_ip]
+  records = [aws_instance.gitlab[0].private_ip]
 }
 
 resource "aws_route53_record" "ldap" {
+  count   = var.enable_ldap ? 1 : 0
   zone_id = module.private_hosted_zone.zone_id
   name    = "ldap.crimsonscallion.com"
   type    = "A"
   ttl     = 300
-  records = [aws_instance.ec2_public_instance_1.private_ip]
+  records = [aws_instance.ec2_public_instance_1[0].private_ip]
 }
 
 

@@ -15,7 +15,8 @@ data "aws_sqs_queue" "factor_ts_result" {
 }
 
 resource "aws_iam_role" "nomad_node" {
-  name = "${local.name_prefix}-node"
+  count = local.enabled
+  name  = "${local.name_prefix}-node"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -30,8 +31,9 @@ resource "aws_iam_role" "nomad_node" {
 }
 
 resource "aws_iam_role_policy" "nomad_sqs" {
-  name = "${local.name_prefix}-sqs"
-  role = aws_iam_role.nomad_node.id
+  count = local.enabled
+  name  = "${local.name_prefix}-sqs"
+  role  = aws_iam_role.nomad_node[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -58,8 +60,9 @@ resource "aws_iam_role_policy" "nomad_sqs" {
 }
 
 resource "aws_iam_role_policy" "nomad_secrets" {
-  name = "${local.name_prefix}-secrets"
-  role = aws_iam_role.nomad_node.id
+  count = local.enabled
+  name  = "${local.name_prefix}-secrets"
+  role  = aws_iam_role.nomad_node[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -75,8 +78,9 @@ resource "aws_iam_role_policy" "nomad_secrets" {
 }
 
 resource "aws_iam_role_policy" "nomad_logs" {
-  name = "${local.name_prefix}-logs"
-  role = aws_iam_role.nomad_node.id
+  count = local.enabled
+  name  = "${local.name_prefix}-logs"
+  role  = aws_iam_role.nomad_node[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -94,8 +98,9 @@ resource "aws_iam_role_policy" "nomad_logs" {
 }
 
 resource "aws_iam_role_policy" "nomad_autoscaler" {
-  name = "${local.name_prefix}-autoscaler"
-  role = aws_iam_role.nomad_node.id
+  count = local.enabled
+  name  = "${local.name_prefix}-autoscaler"
+  role  = aws_iam_role.nomad_node[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -144,8 +149,9 @@ resource "aws_iam_role_policy" "nomad_autoscaler" {
 }
 
 resource "aws_iam_role_policy" "nomad_cloud_auto_join" {
-  name = "${local.name_prefix}-cloud-auto-join"
-  role = aws_iam_role.nomad_node.id
+  count = local.enabled
+  name  = "${local.name_prefix}-cloud-auto-join"
+  role  = aws_iam_role.nomad_node[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -160,11 +166,13 @@ resource "aws_iam_role_policy" "nomad_cloud_auto_join" {
 }
 
 resource "aws_iam_role_policy_attachment" "nomad_ssm" {
-  role       = aws_iam_role.nomad_node.name
+  count      = local.enabled
+  role       = aws_iam_role.nomad_node[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "nomad_node" {
-  name = "${local.name_prefix}-node"
-  role = aws_iam_role.nomad_node.name
+  count = local.enabled
+  name  = "${local.name_prefix}-node"
+  role  = aws_iam_role.nomad_node[0].name
 }

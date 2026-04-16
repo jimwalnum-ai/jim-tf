@@ -26,8 +26,12 @@ export LDAP_METHOD='plain'
 export LDAP_BIND_DN='cn=admin,dc=crimsonscallion,dc=com'
 export LDAP_PASSWORD='admin'
 EOF
-sudo su docker 
-docker-compose up -d
+ENABLE_LDAP=${ENABLE_LDAP:-false}
+
+if [ "$ENABLE_LDAP" = "true" ]; then
+  sudo su docker
+  docker-compose up -d
+fi
 
 sleep 10
 ldapadd -x -W -D "cn=admin,dc=crimsonscallion,dc=com" -f ./cs.ldif

@@ -19,6 +19,7 @@ data "aws_ami" "al2023" {
 }
 
 resource "aws_instance" "ec2_public_instance_1" {
+  count                       = var.enable_ldap ? 1 : 0
   ami                         = data.aws_ami.al2023.id
   subnet_id                   = module.vpc["dev"].public_subnets[0]
   instance_type               = "t3.small"
@@ -104,6 +105,7 @@ resource "aws_instance" "ec2_public_instance_1" {
 }
 
 resource "aws_instance" "gitlab" {
+  count         = var.enable_gitlab ? 1 : 0
   ami           = data.aws_ami.al2023.id
   subnet_id     = module.vpc["dev"].tgw_subnets[0]
   instance_type = "t3.medium"
@@ -112,7 +114,7 @@ resource "aws_instance" "gitlab" {
     volume_type = "gp3"
   }
   iam_instance_profile        = aws_iam_instance_profile.private.name
-  vpc_security_group_ids      = [aws_security_group.gitlab_instance.id]
+  vpc_security_group_ids      = [aws_security_group.gitlab_instance[0].id]
   depends_on                  = [module.vpc["dev"]]
   user_data                   = <<-EOF
     #!/bin/bash
@@ -223,6 +225,7 @@ resource "aws_iam_instance_profile" "private" {
 }
 
 resource "aws_instance" "ec2_private_instance" {
+  count                  = var.enable_private_ec2 ? 1 : 0
   ami                    = data.aws_ami.al2023.id
   subnet_id              = module.vpc["dev"].tgw_subnets[0]
   instance_type          = "t3.micro"
@@ -299,6 +302,7 @@ resource "aws_security_group" "private_instance" {
 ###########################
 
 resource "aws_security_group" "gitlab_alb" {
+  count       = var.enable_gitlab ? 1 : 0
   name        = "gitlab-alb"
   description = "Security group for GitLab ALB"
   vpc_id      = module.vpc["dev"].vpc_id
@@ -319,6 +323,7 @@ resource "aws_security_group" "gitlab_alb" {
 }
 
 resource "aws_security_group" "gitlab_instance" {
+  count       = var.enable_gitlab ? 1 : 0
   name        = "gitlab-instance"
   description = "Security group for GitLab EC2 behind ALB"
   vpc_id      = module.vpc["dev"].vpc_id
@@ -327,7 +332,7 @@ resource "aws_security_group" "gitlab_instance" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.gitlab_alb.id]
+    security_groups = [aws_security_group.gitlab_alb[0].id]
   }
 
   ingress {
@@ -346,15 +351,17 @@ resource "aws_security_group" "gitlab_instance" {
 }
 
 resource "aws_lb" "gitlab" {
+  count              = var.enable_gitlab ? 1 : 0
   name               = "gitlab-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.gitlab_alb.id]
+  security_groups    = [aws_security_group.gitlab_alb[0].id]
   subnets            = module.vpc["dev"].public_subnets
   tags               = merge(local.tags, { Name = "gitlab-alb" })
 }
 
 resource "aws_lb_target_group" "gitlab" {
+  count    = var.enable_gitlab ? 1 : 0
   name     = "gitlab-tg"
   port     = 80
   protocol = "HTTP"
@@ -375,22 +382,24 @@ resource "aws_lb_target_group" "gitlab" {
 }
 
 resource "aws_lb_target_group_attachment" "gitlab" {
-  target_group_arn = aws_lb_target_group.gitlab.arn
-  target_id        = aws_instance.gitlab.id
+  count            = var.enable_gitlab ? 1 : 0
+  target_group_arn = aws_lb_target_group.gitlab[0].arn
+  target_id        = aws_instance.gitlab[0].id
   port             = 80
 }
 
 resource "aws_lb_listener" "gitlab_http" {
-  load_balancer_arn = aws_lb.gitlab.arn
+  count             = var.enable_gitlab ? 1 : 0
+  load_balancer_arn = aws_lb.gitlab[0].arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.gitlab.arn
+    target_group_arn = aws_lb_target_group.gitlab[0].arn
   }
 }
 
 output "gitlab_alb_dns" {
-  value = aws_lb.gitlab.dns_name
+  value = var.enable_gitlab ? aws_lb.gitlab[0].dns_name : null
 }

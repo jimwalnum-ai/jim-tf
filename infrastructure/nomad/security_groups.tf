@@ -17,6 +17,7 @@ data "aws_subnets" "public" {
 }
 
 resource "aws_security_group" "nomad_cluster" {
+  count       = local.enabled
   name        = "${local.name_prefix}-cluster"
   description = "Nomad and Consul cluster traffic"
   vpc_id      = data.aws_vpc.dev.id
@@ -72,7 +73,7 @@ resource "aws_security_group" "nomad_cluster" {
     from_port       = 4646
     to_port         = 4646
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    security_groups = [aws_security_group.alb[0].id]
   }
 
   ingress {
@@ -80,7 +81,7 @@ resource "aws_security_group" "nomad_cluster" {
     from_port       = 8500
     to_port         = 8500
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    security_groups = [aws_security_group.alb[0].id]
   }
 
   egress {

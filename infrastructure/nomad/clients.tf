@@ -1,13 +1,14 @@
 resource "aws_launch_template" "client" {
+  count         = local.enabled
   name_prefix   = "${local.name_prefix}-client-"
   image_id      = data.aws_ami.al2023_arm.id
   instance_type = var.client_instance_type
 
   iam_instance_profile {
-    name = aws_iam_instance_profile.nomad_node.name
+    name = aws_iam_instance_profile.nomad_node[0].name
   }
 
-  vpc_security_group_ids = [aws_security_group.nomad_cluster.id]
+  vpc_security_group_ids = [aws_security_group.nomad_cluster[0].id]
 
   block_device_mappings {
     device_name = "/dev/xvda"
@@ -45,6 +46,7 @@ resource "aws_launch_template" "client" {
 }
 
 resource "aws_autoscaling_group" "clients" {
+  count               = local.enabled
   name                = "${local.name_prefix}-clients"
   min_size            = var.client_min_count
   max_size            = var.client_max_count
@@ -52,8 +54,8 @@ resource "aws_autoscaling_group" "clients" {
   vpc_zone_identifier = data.aws_subnets.public.ids
 
   launch_template {
-    id      = aws_launch_template.client.id
-    version = aws_launch_template.client.latest_version
+    id      = aws_launch_template.client[0].id
+    version = aws_launch_template.client[0].latest_version
   }
 
   instance_refresh {

@@ -1,15 +1,17 @@
 resource "local_file" "autoscaler_job" {
+  count    = local.enabled
   filename = "${path.module}/jobs/autoscaler.nomad.hcl"
   content = templatefile("${path.module}/templates/autoscaler.nomad.hcl.tpl", {
     autoscaler_version = var.nomad_autoscaler_version
     region             = "us-east-1"
-    asg_name           = aws_autoscaling_group.clients.name
+    asg_name           = aws_autoscaling_group.clients[0].name
     client_min_count   = var.client_min_count
     client_max_count   = var.client_max_count
   })
 }
 
 resource "local_file" "sqs_scaler_job" {
+  count    = local.enabled
   filename = "${path.module}/jobs/sqs_scaler.nomad.hcl"
   content = templatefile("${path.module}/templates/sqs_scaler.nomad.hcl.tpl", {
     docker_image                = var.docker_tasks_image
@@ -30,6 +32,7 @@ resource "local_file" "sqs_scaler_job" {
 }
 
 resource "local_file" "process_job" {
+  count    = local.enabled
   filename = "${path.module}/jobs/process.nomad.hcl"
   content = templatefile("${path.module}/templates/process.nomad.hcl.tpl", {
     docker_image             = var.docker_tasks_image
@@ -41,6 +44,7 @@ resource "local_file" "process_job" {
 }
 
 resource "local_file" "persist_job" {
+  count    = local.enabled
   filename = "${path.module}/jobs/persist.nomad.hcl"
   content = templatefile("${path.module}/templates/persist.nomad.hcl.tpl", {
     docker_image             = var.docker_tasks_image
@@ -52,6 +56,7 @@ resource "local_file" "persist_job" {
 }
 
 resource "local_file" "test_msg_job" {
+  count    = local.enabled
   filename = "${path.module}/jobs/test_msg.nomad.hcl"
   content = templatefile("${path.module}/templates/test_msg.nomad.hcl.tpl", {
     docker_image      = var.docker_tasks_image

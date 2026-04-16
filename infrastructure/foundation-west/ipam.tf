@@ -28,4 +28,5 @@ resource "aws_vpc_ipam_pool" "regional" {
 resource "aws_vpc_ipam_pool_cidr" "us-west-2" {
   ipam_pool_id = aws_vpc_ipam_pool.regional.id
   cidr         = local.regional_cidr
+  depends_on   = [aws_vpc_ipam_pool_cidr.top_level]
 }

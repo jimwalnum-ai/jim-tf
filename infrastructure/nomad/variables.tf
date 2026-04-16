@@ -142,7 +142,10 @@ variable "msgs_per_instance" {
   default     = 100
 }
 
+
 locals {
-  name_prefix = "nomad-${var.env}"
-  home_ip     = chomp(file("../../ip.txt"))
+  name_prefix         = "nomad-${var.env}"
+  home_ip             = chomp(file("../../ip.txt"))
+  enabled             = var.enable_nomad ? 1 : 0
+  server_actual_count = var.enable_nomad ? var.server_count : 0
 }

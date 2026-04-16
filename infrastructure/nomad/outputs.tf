@@ -9,17 +9,17 @@ output "server_private_ips" {
 }
 
 output "nomad_ui_url" {
-  value       = "http://${aws_lb.nomad.dns_name}:4646"
+  value       = local.enabled == 1 ? "http://${aws_lb.nomad[0].dns_name}:4646" : ""
   description = "Nomad UI URL (via ALB)."
 }
 
 output "consul_ui_url" {
-  value       = "http://${aws_lb.nomad.dns_name}:8500"
+  value       = local.enabled == 1 ? "http://${aws_lb.nomad[0].dns_name}:8500" : ""
   description = "Consul UI URL (via ALB)."
 }
 
 output "alb_dns_name" {
-  value       = aws_lb.nomad.dns_name
+  value       = local.enabled == 1 ? aws_lb.nomad[0].dns_name : null
   description = "DNS name of the Nomad/Consul ALB."
 }
 
@@ -29,6 +29,6 @@ output "ssh_commands_server" {
 }
 
 output "client_asg_name" {
-  value       = aws_autoscaling_group.clients.name
+  value       = local.enabled == 1 ? aws_autoscaling_group.clients[0].name : null
   description = "Name of the Nomad client ASG."
 }

@@ -17,13 +17,13 @@ data "aws_ami" "al2023_arm" {
 }
 
 resource "aws_instance" "server" {
-  count = var.server_count
+  count = local.server_actual_count
 
   ami                         = data.aws_ami.al2023_arm.id
   instance_type               = var.server_instance_type
   subnet_id                   = element(data.aws_subnets.public.ids, count.index % length(data.aws_subnets.public.ids))
-  vpc_security_group_ids      = [aws_security_group.nomad_cluster.id]
-  iam_instance_profile        = aws_iam_instance_profile.nomad_node.name
+  vpc_security_group_ids      = [aws_security_group.nomad_cluster[0].id]
+  iam_instance_profile        = aws_iam_instance_profile.nomad_node[0].name
   associate_public_ip_address = true
 
   root_block_device {

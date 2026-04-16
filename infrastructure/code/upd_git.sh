@@ -26,8 +26,12 @@ if [ -f /etc/profile.d/ldap.sh ]; then
   . /etc/profile.d/ldap.sh
 fi
 
-cd ~/gitlab
-sudo docker-compose up -d
+ENABLE_GITLAB=${ENABLE_GITLAB:-false}
+
+if [ "$ENABLE_GITLAB" = "true" ]; then
+  cd ~/gitlab
+  sudo docker-compose up -d
+fi
 
 
 
