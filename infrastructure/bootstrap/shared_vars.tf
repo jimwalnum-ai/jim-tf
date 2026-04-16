@@ -8,10 +8,44 @@ variable "enable_ecs" {
   default     = true
 }
 
+variable "enable_ldap" {
+  description = "Create the LDAP EC2 instance and spin up the OpenLDAP container."
+  type        = bool
+  default     = false
+}
+
+variable "enable_gitlab" {
+  description = "Create the GitLab EC2 instance, ALB, and associated resources."
+  type        = bool
+  default     = false
+}
+
+variable "enable_eks" {
+  description = "Set to false to destroy all EKS cluster resources (cluster, node groups, add-ons, Helm releases, Kubernetes manifests, and supporting IAM/KMS)."
+  type        = bool
+  default     = false
+}
+
+variable "enable_nomad" {
+  description = "Deploy the Nomad/Consul cluster (servers, clients, ALB, IAM, jobs). Set to false to destroy all Nomad resources."
+  type        = bool
+  default     = false
+}
+
+variable "enable_private_ec2" {
+  description = "Create the always-on private EC2 instance in the foundation workspace."
+  type        = bool
+  default     = false
+}
+
 locals {
-  state_bucket_name = "${local.prefix}-use1-terraform-state"
-  prefix            = "csx2"
-  enable_ecs        = var.enable_ecs
+  state_bucket_name  = "${local.prefix}-use1-terraform-state"
+  prefix             = "csx3"
+  enable_ecs         = var.enable_ecs
+  enable_eks         = var.enable_eks
+  enable_ecs_web     = var.enable_ecs && !var.enable_eks
+  enable_nomad       = var.enable_nomad
+  enable_private_ec2 = var.enable_private_ec2
   tagmap            = fileexists("./tags.csv") ? csvdecode(file("../tags.csv")) : {}
   dir_tags          = { for rg in local.tagmap : rg.tag => rg.value }
   top_tagmap        = csvdecode(file("../top_level_tags.csv"))
